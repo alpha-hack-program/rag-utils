@@ -1,0 +1,10 @@
+!*.yaml
+__pycache__/
+*.old
+*.log
+*.pyc
+*.tmp
+*.tmp.*
+*.swp
+*.db
+.venv

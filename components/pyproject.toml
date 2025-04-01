@@ -1,0 +1,11 @@
+[project]
+name = "components"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "kfp==2.10.1",
+    "kfp[kubernetes]==2.10.1",
+    "boto3==1.35.54"
+]

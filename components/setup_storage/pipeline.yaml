@@ -1,0 +1,74 @@
+# PIPELINE DEFINITION
+# Name: pipeline
+# Inputs:
+#    pvc_name: str [Default: 'my-pvc']
+#    size_in_gi: int [Default: 1.0]
+components:
+  comp-setup-storage:
+    executorLabel: exec-setup-storage
+    inputDefinitions:
+      parameters:
+        access_mode:
+          defaultValue: ReadWriteOnce
+          isOptional: true
+          parameterType: STRING
+        pvc_name:
+          description: Name of the PVC to create.
+          parameterType: STRING
+        size_in_gi:
+          description: Size of the PVC in GiB.
+          parameterType: NUMBER_INTEGER
+        storage_class:
+          defaultValue: ''
+          description: Storage class for the PVC. Default is an empty string.
+          isOptional: true
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-setup-storage:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - setup_storage
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kubernetes==23.6.0'\
+          \ && \"$0\" \"$@\"\n"
+        - python3
+        - -m
+        - kfp.dsl.executor_main
+        image: quay.io/atarazana/setup_storage:v1.0.1
+pipelineInfo:
+  name: pipeline
+root:
+  dag:
+    tasks:
+      setup-storage:
+        cachingOptions: {}
+        componentRef:
+          name: comp-setup-storage
+        inputs:
+          parameters:
+            pvc_name:
+              componentInputParameter: pvc_name
+            size_in_gi:
+              componentInputParameter: size_in_gi
+        taskInfo:
+          name: setup-storage
+  inputDefinitions:
+    parameters:
+      pvc_name:
+        defaultValue: my-pvc
+        isOptional: true
+        parameterType: STRING
+      size_in_gi:
+        defaultValue: 1.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.10.1
