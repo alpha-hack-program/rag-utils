@@ -80,6 +80,12 @@ def export_documents(
             success_count += 1
             doc_filename = conv_res.input.file.stem
 
+            # Log the file converted and the output file path
+            logging.info(
+                f"Document {conv_res.input.file} converted successfully. "
+                f"Output file: {output_dir / f'{doc_filename}.json'}"
+            )
+
             if conv_res.document:
                 conv_res.document.save_as_json(
                     output_dir / f"{doc_filename}.json",
