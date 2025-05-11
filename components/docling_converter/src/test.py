@@ -35,6 +35,9 @@ from docling.backend.xml.uspto_backend import PatentUsptoDocumentBackend
 # MAX_INPUT_DOCS is the value of MAX_INPUT_DOCS environment variable or 20
 MAX_INPUT_DOCS = int(os.environ.get("MAX_INPUT_DOCS", 2))
 
+# SCRATCH_DIR is the value of SCRATCH_DIR environment variable or "scratch"
+SCRATCH_DIR = os.environ.get("SCRATCH_DIR", "scratch")
+
 # Acceptable input formats with extensions and their corresponding FormatOption
 # for example: InputFormat.PDF (["pdf", "PDF"]) -> PdfFormatOption
 ALLOWED_INPUT_FORMATS = {
@@ -418,7 +421,7 @@ def main():
     # Convert the documents
     success, partial_success, failure = docling_convert(
         input_doc_paths,
-        output_dir=Path("scratch"),
+        output_dir=Path(SCRATCH_DIR),
     )
 
     # Log the conversion results
