@@ -16,6 +16,8 @@ RUN pip install --no-cache-dir kfp==2.8.0
 COPY ${COMPONENT_NAME}/src/ .
 COPY shared ./shared
 
+USER 1001
+
 # Install docling-tools
 ENV \
     # On container environments, always set a thread budget to avoid undesired thread congestion.
