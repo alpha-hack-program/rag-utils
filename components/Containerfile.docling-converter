@@ -13,9 +13,6 @@ COPY ${COMPONENT_NAME}/src/runtime-requirements.txt runtime-requirements.txt
 RUN pip install --no-cache-dir -r runtime-requirements.txt
 RUN pip install --no-cache-dir kfp==2.8.0
 
-COPY ${COMPONENT_NAME}/src/ .
-COPY shared ./shared
-
 USER 1001
 
 # Install docling-tools
@@ -39,3 +36,6 @@ RUN echo "Downloading models..." && \
     docling-tools models download -o "${DOCLING_SERVE_ARTIFACTS_PATH}" ${MODELS_LIST} && \
     chown -R 1001:0 ${CACHE_DIR} && \
     chmod -R g=u ${CACHE_DIR}
+
+COPY ${COMPONENT_NAME}/src/ .
+COPY shared ./shared
