@@ -92,6 +92,10 @@ def export_documents(
                     output_dir / f"{doc_filename}.md",
                     image_mode=ImageRefMode.PLACEHOLDER,
                 )
+
+                # Create a file with the conversion result in the output directory
+                with (output_dir / f"{doc_filename}.result").open("w") as fp:
+                    json.dump(conv_res.to_dict(), fp, indent=2)
             else:
                 _log.error(
                     f"Document {conv_res.input.file} was converted but no document was created."
