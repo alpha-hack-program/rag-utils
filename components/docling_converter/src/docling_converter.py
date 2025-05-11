@@ -51,7 +51,7 @@ TARGET_IMAGE=f"{REGISTRY}/{COMPONENT_NAME}:{TAG}"
 
 # Pip package versions
 LOAD_DOTENV_PIP_VERSION="0.1.0"
-DOCLING_PIP_VERSION="2.16.0"
+DOCLING_PIP_VERSION="2.31.0"
 
 # MAX_INPUT_DOCS is the value of MAX_INPUT_DOCS environment variable or 20
 MAX_INPUT_DOCS = int(os.environ.get("MAX_INPUT_DOCS", 2))
@@ -421,7 +421,7 @@ def _docling_convert(
 @dsl.component(
     base_image=BASE_IMAGE,
     target_image=TARGET_IMAGE,
-    packages_to_install=[f"docling=={DOCLING_PIP_VERSION}", f"load_dotenv=={LOAD_DOTENV_PIP_VERSION}"]
+    packages_to_install=[f"docling[vlm]=={DOCLING_PIP_VERSION}", f"load_dotenv=={LOAD_DOTENV_PIP_VERSION}"]
 )
 def docling_chunker(
     input_doc_paths: str,  # Comma-separated list of input document paths
