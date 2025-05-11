@@ -29,7 +29,6 @@ from docling.backend.md_backend import MarkdownDocumentBackend
 from docling.backend.msexcel_backend import MsExcelDocumentBackend
 from docling.backend.mspowerpoint_backend import MsPowerpointDocumentBackend
 from docling.backend.msword_backend import MsWordDocumentBackend
-from docling.backend.xml.pubmed_backend import PubMedDocumentBackend
 from docling.backend.xml.uspto_backend import PatentUsptoDocumentBackend
 
 # MAX_INPUT_DOCS is the value of MAX_INPUT_DOCS environment variable or 20
@@ -314,9 +313,6 @@ def docling_convert(
         ),
         InputFormat.XML_USPTO: FormatOption(
             pipeline_cls=SimplePipeline, backend=PatentUsptoDocumentBackend
-        ),
-        InputFormat.XML_PUBMED: FormatOption(
-            pipeline_cls=SimplePipeline, backend=PubMedDocumentBackend
         ),
         InputFormat.IMAGE: FormatOption(
             pipeline_cls=StandardPdfPipeline, backend=DoclingParseV2DocumentBackend
