@@ -1,0 +1,38 @@
+# KFP based Containerfile
+
+ARG BASE_IMAGE
+
+FROM ${BASE_IMAGE}
+
+ARG COMPONENT_NAME
+
+WORKDIR /usr/local/src/kfp/components
+
+COPY ${COMPONENT_NAME}/src/runtime-requirements.txt runtime-requirements.txt
+
+RUN pip install --no-cache-dir -r runtime-requirements.txt
+RUN pip install --no-cache-dir kfp==2.8.0
+
+COPY ${COMPONENT_NAME}/src/ .
+COPY shared ./shared
+
+# Install docling-tools
+ENV \
+    # On container environments, always set a thread budget to avoid undesired thread congestion.
+    OMP_NUM_THREADS=4 \
+    LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8 \
+    PYTHONIOENCODING=utf-8 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/opt/app-root \
+    DOCLING_SERVE_ARTIFACTS_PATH=/opt/app-root/src/.cache/docling/models
+
+ARG MODELS_LIST="layout tableformer picture_classifier easyocr"
+
+RUN echo "Downloading models..." && \
+    HF_HUB_DOWNLOAD_TIMEOUT="90" \
+    HF_HUB_ETAG_TIMEOUT="90" \
+    docling-tools models download -o "${DOCLING_SERVE_ARTIFACTS_PATH}" ${MODELS_LIST} && \
+    chown -R 1001:0 ${DOCLING_SERVE_ARTIFACTS_PATH} && \
+    chmod -R g=u ${DOCLING_SERVE_ARTIFACTS_PATH}
