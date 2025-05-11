@@ -32,6 +32,6 @@ export PYTHONPATH=${PYTHONPATH}:$(pwd)/${COMPONENT_NAME}/src:$(pwd)/shared
 kfp component build ${COMPONENT_NAME}/src/ --component-filepattern ${COMPONENT_NAME}.py --no-push-image --no-build-image
 
 # Build the image using the BASE_IMAGE build arg
-podman build -t ${COMPONENT_NAME}:${TAG} -f ./Containerfile . \
+podman build -t ${COMPONENT_NAME}:${TAG} -f ${CONTAINER_FILE} . \
   --build-arg BASE_IMAGE=${BASE_IMAGE} \
   --build-arg COMPONENT_NAME=${COMPONENT_NAME}

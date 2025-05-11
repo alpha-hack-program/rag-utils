@@ -1,6 +1,7 @@
 import os
 import boto3
 import hashlib
+import json
 
 from kfp import compiler
 from kfp import dsl
@@ -177,7 +178,9 @@ def s3_sync(
         force=force
     )
 
-    return ",".join(list_of_files) 
+    # return the list as a json string
+    return json.dumps(list_of_files)
+    
 
 
 if __name__ == "__main__":

@@ -1,0 +1,132 @@
+# PIPELINE DEFINITION
+# Name: pipeline
+# Inputs:
+#    aws_access_key_id: str [Default: 'minio']
+#    aws_secret_access_key: str [Default: 'minio123']
+#    bucket_name: str [Default: 'documents']
+#    endpoint_url: str [Default: 'http://minio.minio.svc.cluster.local:9000']
+#    folder: str [Default: 'collections']
+#    force: bool [Default: False]
+#    local_folder: str [Default: 'collections']
+#    region_name: str [Default: 'none']
+#    root_mount_path: str [Default: '/tmp']
+components:
+  comp-s3-sync:
+    executorLabel: exec-s3-sync
+    inputDefinitions:
+      parameters:
+        aws_access_key_id:
+          parameterType: STRING
+        aws_secret_access_key:
+          parameterType: STRING
+        bucket_name:
+          parameterType: STRING
+        endpoint_url:
+          parameterType: STRING
+        folder:
+          parameterType: STRING
+        force:
+          defaultValue: false
+          isOptional: true
+          parameterType: BOOLEAN
+        local_folder:
+          parameterType: STRING
+        region_name:
+          parameterType: STRING
+        root_mount_path:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-s3-sync:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - s3_sync
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'load_dotenv==0.1.0'\
+          \ 'botocore==1.35.54' 'boto3==1.35.54' && \"$0\" \"$@\"\n"
+        - python3
+        - -m
+        - kfp.dsl.executor_main
+        image: quay.io/atarazana/s3_sync:v1.0.5
+pipelineInfo:
+  name: pipeline
+root:
+  dag:
+    tasks:
+      s3-sync:
+        cachingOptions: {}
+        componentRef:
+          name: comp-s3-sync
+        inputs:
+          parameters:
+            aws_access_key_id:
+              componentInputParameter: aws_access_key_id
+            aws_secret_access_key:
+              componentInputParameter: aws_secret_access_key
+            bucket_name:
+              componentInputParameter: bucket_name
+            endpoint_url:
+              componentInputParameter: endpoint_url
+            folder:
+              componentInputParameter: folder
+            force:
+              componentInputParameter: force
+            local_folder:
+              componentInputParameter: local_folder
+            region_name:
+              componentInputParameter: region_name
+            root_mount_path:
+              componentInputParameter: root_mount_path
+        taskInfo:
+          name: s3-sync
+  inputDefinitions:
+    parameters:
+      aws_access_key_id:
+        defaultValue: minio
+        isOptional: true
+        parameterType: STRING
+      aws_secret_access_key:
+        defaultValue: minio123
+        isOptional: true
+        parameterType: STRING
+      bucket_name:
+        defaultValue: documents
+        isOptional: true
+        parameterType: STRING
+      endpoint_url:
+        defaultValue: http://minio.minio.svc.cluster.local:9000
+        isOptional: true
+        parameterType: STRING
+      folder:
+        defaultValue: collections
+        isOptional: true
+        parameterType: STRING
+      force:
+        defaultValue: false
+        isOptional: true
+        parameterType: BOOLEAN
+      local_folder:
+        defaultValue: collections
+        isOptional: true
+        parameterType: STRING
+      region_name:
+        defaultValue: none
+        isOptional: true
+        parameterType: STRING
+      root_mount_path:
+        defaultValue: /tmp
+        isOptional: true
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.10.1

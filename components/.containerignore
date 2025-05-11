@@ -9,3 +9,4 @@
 **/.vscode
 **/.pytest_cache
 **/component_metadata
+**/scratch*

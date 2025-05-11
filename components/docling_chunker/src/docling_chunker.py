@@ -1,12 +1,17 @@
 import os
-import tempfile
-
-import boto3
 import shutil
-import torch
-import mlflow
 
-from ultralytics import YOLO, settings
+from pathlib import Path
+
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import (
+    AcceleratorDevice,
+    AcceleratorOptions,
+    PdfPipelineOptions,
+)
+from docling.datamodel.settings import settings
+from docling.document_converter import DocumentConverter, PdfFormatOption
+
 
 from shared.kubeflow import get_token
 
@@ -22,57 +27,40 @@ REGISTRY=os.environ.get("REGISTRY", f"image-registry.openshift-image-registry.sv
 TAG=os.environ.get("TAG", f"latest")
 TARGET_IMAGE=f"{REGISTRY}/{COMPONENT_NAME}:{TAG}"
 
-ULTRALYTICS_PIP_VERSION="8.3.22"
 LOAD_DOTENV_PIP_VERSION="0.1.0"
-NUMPY_PIP_VERSION="1.26.4"
-MLFLOW_PIP_VERSION="2.17.1"
-ONNXRUNTIME_PIP_VERSION="1.19.2"
-ONNXSLIM_PIP_VERSION="0.1.36"
-BOTOCORE_PIP_VERSION="1.35.54"
-BOTO3_PIP_VERSION="1.35.54"
 
-# Function that downloads the yolo model passed as an argument from an S3 bucket, saves it to a temporary folder
-# and returns the full path to it.
-# Arguments:
-# - endpoint_url: str      # S3 endpoint url
-# - region_name: str       # S3 region
-# - bucket_name: str       # S3 bucket
-# - yolo_model_s3_key: str # file key to the yolo model
-def download_yolo_model(
-        endpoint_url: str, 
-        region_name: str, 
-        bucket_name: str, 
-        base_models_folder: str,
-        model_file_name: str,
-        aws_access_key_id: str, 
-        aws_secret_access_key: str) -> str:
-    # Create an S3 client
-    s3 = boto3.client(
-        's3', 
-        endpoint_url=endpoint_url, 
-        region_name=region_name,
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key
+# Function to convert a PDF file to Markdown text
+def convert_pdf_to_markdown(file_path: str) -> str:
+    """
+    Converts a PDF file at `file_path` to Markdown text and returns it.
+    """
+    pipeline_options = PdfPipelineOptions()
+    pipeline_options.accelerator_options = accelerator_options
+    pipeline_options.do_ocr = True
+    pipeline_options.do_table_structure = True
+    pipeline_options.table_structure_options.do_cell_matching = True
+
+    # Enable the profiling to measure the time spent
+    settings.debug.profile_pipeline_timings = True
+
+    converter = DocumentConverter(
+        format_options={
+            InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+        }
     )
-    
-    # Create a temporary directory
-    temp_dir = tempfile.mkdtemp()
-    
-    # Define the local file path
-    local_model_path = os.path.join(temp_dir, os.path.basename(model_file_name))
-    
-    try:
-        # Download the file from S3
-        yolo_model_s3_key = f"{base_models_folder}/{model_file_name}"
-        print(f"Downloading model from {yolo_model_s3_key} to {local_model_path}")
-        s3.download_file(bucket_name, yolo_model_s3_key, local_model_path)
-        print(f"Downloaded model {local_model_path}")
-    except s3.exceptions.NoSuchKey:
-        raise ValueError(f"The key '{yolo_model_s3_key}' was not found in bucket '{bucket_name}'.")
-    
-    return local_model_path
 
-# Function that trains a yolo base model with a dataset and a bunch of hyperparameters
+    # Convert the document
+    conversion_result = converter.convert(file_path)
+    document = conversion_result.document
+
+    # Print total conversion time
+    conversion_secs = conversion_result.timings["pipeline_total"].times
+    print(f"Conversion secs: {conversion_secs}")
+
+    # Return the resulting Markdown text
+    return document.export_to_markdown()
+
+# Function that 
 @dsl.component(
     base_image=BASE_IMAGE,
     target_image=TARGET_IMAGE,

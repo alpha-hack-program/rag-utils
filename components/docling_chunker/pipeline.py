@@ -4,7 +4,7 @@ import os
 
 from kfp import dsl
 
-from src.docling_chunker import train_yolo
+from src.docling_chunker import docling_chunker
 
 COMPONENT_NAME=os.getenv("COMPONENT_NAME")
 print(f"COMPONENT_NAME: {COMPONENT_NAME}")

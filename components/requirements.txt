@@ -1,3 +1,5 @@
 kfp==2.10.1
 kfp[kubernetes]==2.10.1
 boto3==1.35.54
+pypdf==5.4.0
+langchain-community==0.3.20

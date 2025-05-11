@@ -1,0 +1,3 @@
+La comunidad.
+
+Boceto a lapiz para colorear depués con acuarelas, papel para acuarela blanco puro. Una mujer desesperada —gabardina, despeinada, maletín en mano— corre por una azotea de estilo neo-clásico al amanecer. Tras ella, alzándose imponentes contra el cielo gris de Madrid, cuatro caballos de bronce galopan inmóviles tirando de una cuádriga con su aúriga, sobre la cornisa del antigo Banco de Vizcaya. El viento sopla con fuerza, agitando su ropa, mientras el vértigo de la altura acentúa el suspense. Abajo, la ciudad empieza a despertar. Es una imagen de poder, peligro y surrealismo castizo.
