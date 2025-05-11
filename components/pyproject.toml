@@ -3,13 +3,13 @@ name = "components"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10,<=3.11"
+requires-python = ">=3.10,<3.12"
 dependencies = [
     "kfp==2.10.1",
     "kfp[kubernetes]==2.10.1",
     "boto3==1.35.54",
     "pypdf==5.4.0",
     "langchain-community==0.3.20",
-    "docling==2.16.0",
+    "docling[vlm]==2.31.0",
     "torch==2.2.2",
 ]
