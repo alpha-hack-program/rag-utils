@@ -368,12 +368,17 @@ def docling_converter(
     Convert documents using Docling.
     Args:
         input_doc_paths (str): Comma-separated list of input document paths.
-        output_dir (Path): Directory to save the converted documents.
+        output_dir (str): Directory to save the converted documents.
     Returns:
         list[str]: Lists of successfully converted
     """
     # Convert the input document paths from a comma-separated string to a list of strings objects
     input_doc_paths_list = [path.strip() for path in input_doc_paths.split(",")]
+
+    # Convert output_dir to a Path object and fail if it can't be converted
+    output_dir = Path(output_dir)
+    if not isinstance(output_dir, Path):
+        raise ValueError(f"Output directory {output_dir} is not a valid path.")
 
     # Convert the documents
     succesfully_converted_documents, partially_converted_documents, failed_documents = _docling_convert(
