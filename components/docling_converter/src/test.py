@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import time
+import argparse
 
 from pathlib import Path
 
@@ -34,9 +35,6 @@ from docling.backend.xml.uspto_backend import PatentUsptoDocumentBackend
 # MAX_INPUT_DOCS is the value of MAX_INPUT_DOCS environment variable or 20
 MAX_INPUT_DOCS = int(os.environ.get("MAX_INPUT_DOCS", 2))
 
-# SCRATCH_DIR is the value of SCRATCH_DIR environment variable or "scratch"
-SCRATCH_DIR = os.environ.get("SCRATCH_DIR", "scratch")
-
 # Acceptable input formats with extensions and their corresponding FormatOption
 # for example: InputFormat.PDF (["pdf", "PDF"]) -> PdfFormatOption
 ALLOWED_INPUT_FORMATS = {
@@ -47,129 +45,68 @@ ALLOWED_INPUT_FORMATS = {
     InputFormat.HTML: ["html","HTML"],
 }
 
+# Allowed log levels
+VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+
+# Read from environment variable
+LOG_LEVEL_STR = os.getenv("LOG_LEVEL", "WARNING").upper()
+
 # Set the log level for the 'docling.utils' logger to ERROR
 logging.getLogger('docling').setLevel(logging.ERROR)
 
 # Create a logger for this module
 _log = logging.getLogger(__name__)
 
-def export_documents(
-    conv_results: list[ConversionResult],
+def export_document(
+    conv_result: ConversionResult,
     output_dir: Path,
-):
+) -> bool:
     """
     Export the converted documents to the specified output directory.
     Args:
-        conv_results (Iterable[ConversionResult]): Conversion results to export.
+        conv_result: ConversionResult: The conversion result object containing the conversion status and document.
         output_dir (Path): Directory to save the converted documents.
     Returns:
         Tuple[int, int, int]: Counts of successful, partially successful, and failed conversions.
     """
+
+    # Log entry
+    _log.debug(f">>> Exporting documents to {output_dir}")
 
     # Create the output directory if it doesn't exist
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Initialize counts for success, failure, and partial success
-    success_count = 0
-    failure_count = 0
-    partial_success_count = 0
-
-    # Iterate over the conversion results and export the documents
-    for conv_res in conv_results:
-        if conv_res.status == ConversionStatus.SUCCESS:
-            success_count += 1
-            doc_filename = conv_res.input.file.stem
-
-            # Log the file converted and the output file path
-            logging.info(
-                f"Document {conv_res.input.file} converted successfully. "
-                f"Output file: {output_dir / f'{doc_filename}.json'}"
-            )
-
-            if conv_res.document:
-                conv_res.document.save_as_json(
-                    output_dir / f"{doc_filename}.json",
-                    image_mode=ImageRefMode.PLACEHOLDER,
-                )
-                conv_res.document.save_as_doctags(
-                    output_dir / f"{doc_filename}.doctags.txt"
-                )
-                conv_res.document.save_as_markdown(
-                    output_dir / f"{doc_filename}.md",
-                    image_mode=ImageRefMode.PLACEHOLDER,
-                )
-
-                # Create a file with the conversion result in the output directory
-                with (output_dir / f"{doc_filename}.result").open("w") as fp:
-                    json.dump(conv_res.to_dict(), fp, indent=2)
-            else:
-                _log.error(
-                    f"Document {conv_res.input.file} was converted but no document was created."
-                )
-                with (output_dir / f"{doc_filename}.json").open("w") as fp:
-                    json.dump(conv_res.to_dict(), fp, indent=2)
-
-        elif conv_res.status == ConversionStatus.PARTIAL_SUCCESS:
-            _log.error(
-                f"Document {conv_res.input.file} was partially converted with the following errors:"
-            )
-            for item in conv_res.errors:
-                _log.error(f"\t{item.error_message}")
-            partial_success_count += 1
-        else:
-            _log.fatal(f"Document {conv_res.input.file} failed to convert.")
-            failure_count += 1
-
-    _log.debug(
-        f"Processed {success_count + partial_success_count + failure_count} docs, "
-        f"of which {failure_count} failed "
-        f"and {partial_success_count} were partially converted."
-    )
-    return success_count, partial_success_count, failure_count
-
-def convert_batch(
-    input_doc_paths: list[Path],
-    output_dir: Path,
-    pipeline_options: PdfPipelineOptions,
-    converter: DocumentConverter,
-):
-    """
-    Convert a batch of documents using the provided converter and pipeline options.
-    Args:
-        input_doc_paths (Iterable[Path]): Paths to the input documents.
-        output_dir (Path): Directory to save the converted documents.
-        pipeline_options (PdfPipelineOptions): Options for the PDF pipeline.
-        converter (DocumentConverter): The document converter instance.
-    Returns:
-        Tuple[int, int, int]: Counts of successful, partially successful, and failed conversions.
-    """
-    # Raise value errors if the input document paths are empty or invalid
-    if not input_doc_paths:
-        raise ValueError("No input document paths provided.")
-    if not all(path.exists() for path in input_doc_paths):
-        raise ValueError("Some input document paths do not exist.")
-    if not all(path.is_file() for path in input_doc_paths):
-        raise ValueError("Some input document paths are not files.")
     
-    # Create the output directory if it doesn't exist
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # Check the conversion status and handle accordingly
+    if conv_result.status == ConversionStatus.SUCCESS:
+        doc_filename = conv_result.input.file.stem
 
-    # Raise value errors if pipeline options are invalid
-    if not isinstance(pipeline_options, PdfPipelineOptions):
-        raise ValueError("Invalid pipeline options provided.")
-    if not isinstance(converter, DocumentConverter):
-        raise ValueError("Invalid document converter provided.")
+        # Log the file converted and the output file path
+        logging.info(
+            f"Document {conv_result.input.file} converted successfully. "
+            f"Output file: {output_dir / f'{doc_filename}.json'}"
+        )
 
-    # Convert the documents
-    conv_results = converter.convert_all(
-        input_doc_paths,
-        raises_on_error=False,  # to let conversion run through all and examine results at the end
-    )
-    success_count, partial_success_count, failure_count = export_documents(
-        conv_results, output_dir=output_dir
-    )
+        if conv_result.document:
+            conv_result.document.save_as_json(
+                output_dir / f"{doc_filename}.json",
+                image_mode=ImageRefMode.PLACEHOLDER,
+            )
+            conv_result.document.save_as_doctags(
+                output_dir / f"{doc_filename}.doctags.txt"
+            )
+            conv_result.document.save_as_markdown(
+                output_dir / f"{doc_filename}.md",
+                image_mode=ImageRefMode.PLACEHOLDER,
+            )
+        else:
+            _log.error(
+                f"Document {conv_result.input.file} was converted but no document was created."
+            )
+            with (output_dir / f"{doc_filename}.json").open("w") as fp:
+                json.dump(conv_result.to_dict(), fp, indent=2)
+            return False
 
-    return success_count, partial_success_count, failure_count
+    return True
 
 def get_allowed_list_of_input_formats() -> list[InputFormat]:
     """
@@ -223,7 +160,7 @@ def generate_format_options(
 # Function to convert documents using Docling
 # This function takes a list of input document paths and an output directory
 # and converts the documents using the specified pipeline options.
-def docling_convert(
+def _docling_convert(
     input_doc_paths: list[str],
     output_dir: Path
 ) -> tuple[list[str], list[str], list[str]]:
@@ -363,21 +300,15 @@ def docling_convert(
         for conv_res in conv_results:
             if conv_res.status == ConversionStatus.SUCCESS:
                 succesfully_converted_documents.append(conv_res.input.file)
+                export_document(
+                    conv_res,
+                    output_dir=output_dir,
+                )
             elif conv_res.status == ConversionStatus.PARTIAL_SUCCESS:
                 partially_converted_documents.append(conv_res.input.file)
             else:
                 failed_documents.append(conv_res.input.file)
 
-        # Export the documents in the batch
-        success_count, partial_success_count, failure_count = export_documents(
-            conv_results, output_dir=output_dir
-        )
-        # Log the conversion results
-        _log.debug(
-            f"Processed {success_count + partial_success_count + failure_count} docs in batch, "
-            f"of which {failure_count} failed "
-            f"and {partial_success_count} were partially converted."
-        )
     # Log the non-existing paths
     if non_existing_paths:
         _log.warning(
@@ -406,28 +337,56 @@ def docling_convert(
     )
 
 def main():
-    logging.basicConfig(level=logging.INFO)
+    # Validate and set level
+    if LOG_LEVEL_STR in VALID_LOG_LEVELS:
+        log_level = getattr(logging, LOG_LEVEL_STR)
+    else:
+        print(f"Invalid LOG_LEVEL '{LOG_LEVEL_STR}' - defaulting to WARNING")
+        log_level = logging.WARNING
 
+    logging.basicConfig(level=log_level)
+
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Parse outputdir, basedir, and a list of files.")
+    
+    parser.add_argument(
+        '--outputdir',
+        required=True,
+        help='Path to the output directory'
+    )
+    
+    parser.add_argument(
+        '--basedir',
+        required=True,
+        help='Path to the base directory'
+    )
+
+    parser.add_argument(
+        'files',
+        nargs='+',
+        help='List of input files'
+    )
+    
+    args = parser.parse_args()
+
+    print(f"Output directory: {args.outputdir}")
+    print(f"Base directory: {args.basedir}")
+    print("Files:")
+    for file in args.files:
+        print(f"  - {file}")
+
+    # Generate input document paths from command line arguments
     input_doc_paths = [
-        # "./tests/data/2203.01017v2.pdf",
-        # "./tests/data/2206.01062v1.pdf",
-        "./tests/data/2305.03393v1.pdf",
-        "./tests/data/GenAI Proof of Concept Process Guidebook.docx",
-        "./tests/data/Innovate Together.pptx",
-        "./tests/data/readme-test.md",
-        "./tests/data/L1 Ether Application Engine.md",
-        "./tests/data/Workplace Introduction.md",
-        "./tests/data/non_existing_file.pdf",
-        "./tests/data/invalid_extension.txt",
+        os.path.join(args.basedir, file) for file in args.files
     ]
 
     # Start the timer
     start_time = time.time()
 
     # Convert the documents
-    success, partial_success, failure = docling_convert(
+    success, partial_success, failure = _docling_convert(
         input_doc_paths,
-        output_dir=Path(SCRATCH_DIR),
+        output_dir=Path(args.outputdir),
     )
 
     # Log the conversion results
