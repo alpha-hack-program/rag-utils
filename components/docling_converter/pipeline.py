@@ -4,7 +4,7 @@ import os
 
 from kfp import dsl
 
-from src.docling_converter import docling_chunker
+from src.docling_converter import docling_converter
 
 COMPONENT_NAME=os.getenv("COMPONENT_NAME")
 print(f"COMPONENT_NAME: {COMPONENT_NAME}")
@@ -18,7 +18,7 @@ def pipeline(
 ):
 
     # Convert documents to JSON(docling format) and markdown
-    train_model_task = docling_chunker(
+    train_model_task = docling_converter(
        input_doc_paths=input_doc_paths,
         output_dir=output_dir, 
     ).set_caching_options(False)

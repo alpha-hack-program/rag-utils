@@ -360,7 +360,7 @@ def _docling_convert(
     target_image=TARGET_IMAGE,
     packages_to_install=[f"docling[vlm]=={DOCLING_PIP_VERSION}", f"load_dotenv=={LOAD_DOTENV_PIP_VERSION}"]
 )
-def docling_chunker(
+def docling_converter(
     input_doc_paths: str,  # Comma-separated list of input document paths
     output_dir: str
 ) -> str:
@@ -392,9 +392,9 @@ if __name__ == "__main__":
     # Generate and save the component YAML file
     component_package_path = __file__.replace('.py', '.yaml')
 
-    docling_chunker.save_component_yaml(component_package_path)
+    docling_converter.save_component_yaml(component_package_path)
 
     # compiler.Compiler().compile(
-    #     pipeline_func=docling_chunker,
+    #     pipeline_func=docling_converter,
     #     package_path=component_package_path
     # )

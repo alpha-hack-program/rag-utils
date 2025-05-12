@@ -1,13 +1,13 @@
 # PIPELINE DEFINITION
-# Name: docling-chunker
+# Name: docling-converter
 # Inputs:
 #    input_doc_paths: str
 #    output_dir: str
 # Outputs:
 #    Output: str
 components:
-  comp-docling-chunker:
-    executorLabel: exec-docling-chunker
+  comp-docling-converter:
+    executorLabel: exec-docling-converter
     inputDefinitions:
       parameters:
         input_doc_paths:
@@ -22,26 +22,26 @@ components:
           parameterType: STRING
 deploymentSpec:
   executors:
-    exec-docling-chunker:
+    exec-docling-converter:
       container:
         args:
         - --executor_input
         - '{{$}}'
         - --function_to_execute
-        - docling_chunker
+        - docling_converter
         command:
         - sh
         - -c
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet --no-warn-script-location 'docling==2.16.0'\
+          \ python3 -m pip install --quiet --no-warn-script-location 'docling[vlm]==2.31.0'\
           \ 'load_dotenv==0.1.0' && \"$0\" \"$@\"\n"
         - python3
         - -m
         - kfp.dsl.executor_main
         image: quay.io/atarazana/docling_converter:v1.0.1
 pipelineInfo:
-  name: docling-chunker
+  name: docling-converter
 root:
   dag:
     outputs:
@@ -49,13 +49,13 @@ root:
         Output:
           valueFromParameter:
             outputParameterKey: Output
-            producerSubtask: docling-chunker
+            producerSubtask: docling-converter
     tasks:
-      docling-chunker:
+      docling-converter:
         cachingOptions:
           enableCache: true
         componentRef:
-          name: comp-docling-chunker
+          name: comp-docling-converter
         inputs:
           parameters:
             input_doc_paths:
@@ -63,7 +63,7 @@ root:
             output_dir:
               componentInputParameter: output_dir
         taskInfo:
-          name: docling-chunker
+          name: docling-converter
   inputDefinitions:
     parameters:
       input_doc_paths:
