@@ -49,10 +49,12 @@ def _s3_sync(
                       aws_access_key_id=aws_access_key_id,
                       aws_secret_access_key=aws_secret_access_key)
 
+    # Ensure the destination base directory exists
     dest_base = os.path.join(root_mount_path, local_folder)
     if not os.path.exists(dest_base):
         os.makedirs(dest_base)
 
+    # Paginate through the S3 objects in the specified bucket and folder
     list_of_files = []
     paginator = s3.get_paginator('list_objects_v2')
     page_iterator = paginator.paginate(Bucket=bucket_name, Prefix=folder)
@@ -65,24 +67,15 @@ def _s3_sync(
         for obj in page['Contents']:
             remote_key = obj['Key']
 
-            if remote_key.startswith(folder):
-                key_relative = remote_key[len(folder):].lstrip('/')
-            else:
-                key_relative = remote_key
-
-            parts = key_relative.split('/')
-            if len(parts) < 5:
-                print(f"Skipping {remote_key}: does not match expected structure")
+            # Get the parts of the remote key
+            # The expected structure is: <collection>/<x>/<y>/<z>/...
+            parts = remote_key.split('/')
+            if len(parts) <= 0:
+                print(f"Skipping {remote_key}: we need at least a root folder 'collection'")
                 continue
 
-            collection, language, area, document_id, version = parts[0], parts[1], parts[2], parts[3], parts[4]
-            # if language not in ['en', 'es', 'pt']:
-            #     print(f"Skipping {remote_key}: language '{language}' is not one of [en, es, pt]")
-            #     continue
-
-            # Join all the parts skipping the first one which is the root folder
-            relative_path = os.path.join(collection, language, area, document_id, version, *parts[4:])
-            # relative_path = os.path.join(*parts[1:])
+            # Join all the parts
+            relative_path = os.path.join(*parts[0:])
             local_file_path = os.path.join(dest_base, relative_path)
 
             remote_size = obj.get('Size', 0)

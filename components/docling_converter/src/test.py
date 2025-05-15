@@ -3,6 +3,7 @@ import json
 import logging
 import time
 import argparse
+import hashlib
 
 from pathlib import Path
 
@@ -31,6 +32,8 @@ from docling.backend.msexcel_backend import MsExcelDocumentBackend
 from docling.backend.mspowerpoint_backend import MsPowerpointDocumentBackend
 from docling.backend.msword_backend import MsWordDocumentBackend
 from docling.backend.xml.uspto_backend import PatentUsptoDocumentBackend
+
+from shared.rag_utils import calculate_md5, is_processed, mark_file_processed
 
 # MAX_INPUT_DOCS is the value of MAX_INPUT_DOCS environment variable or 20
 MAX_INPUT_DOCS = int(os.environ.get("MAX_INPUT_DOCS", 2))
@@ -161,60 +164,64 @@ def generate_format_options(
 # This function takes a list of input document paths and an output directory
 # and converts the documents using the specified pipeline options.
 def _docling_convert(
-    input_doc_paths: list[str],
+    input_dir: Path,
     output_dir: Path
 ) -> tuple[list[str], list[str], list[str]]:
-    # Log input document paths
-    _log.info(f"Input document paths: {', '.join(input_doc_paths)}")
+    """
+    Convert documents using Docling.
+    Args:
+        input_dir (Path): Directory containing the input documents.
+        output_dir (Path): Directory to save the converted documents.
+    Returns:
+        Tuple[list[str], list[str], list[str]]: Lists of successfully converted, partially converted, and failed documents.
+    """
+
+    # Log input directory
+    _log.info(f"Input directory: {input_dir}")
     # Log output directory
     _log.info(f"Output directory: {output_dir}")
     
-    # Raise value errors if the input document paths are empty or invalid
-    if not input_doc_paths:
-        raise ValueError("No input document paths provided.")
-
-    # Check if input_doc_paths is a list of strings
-    if not all(isinstance(path, str) for path in input_doc_paths):
-        raise ValueError("Some input document paths are not strings.")
-
-    # Check if all input document paths exist and separate them non existing paths and existing paths
-    input_doc_paths = [Path(path) for path in input_doc_paths]
-    non_existing_paths = [path for path in input_doc_paths if not path.exists()]
-    existing_paths = [path for path in input_doc_paths if path.exists()]
-
-    # Log the non-existing paths
-    if non_existing_paths:
-        _log.warning(
-            f"The following input document paths do not exist: {', '.join(map(str, non_existing_paths))}"
-        )
-
-    # Convert existing_paths to a list of Path objects
-    existing_paths = [Path(path) for path in existing_paths]
+    # Check if the input directory exists
+    if not input_dir.exists():
+        _log.error(f"Input directory {input_dir} does not exist.")
+        raise FileNotFoundError(f"Input directory {input_dir} does not exist.")
 
     # Check if all existing paths have supported extensions and separate them into valid and invalid extensions
     valid_extensions = [
         ext for fmt, exts in ALLOWED_INPUT_FORMATS.items() for ext in exts
     ]
-    invalid_extensions = [
-        path for path in existing_paths if path.suffix[1:] not in valid_extensions
-    ]
-    if invalid_extensions:
-        # Log the invalid extensions
-        _log.info(
-            f"The following input document paths have unsupported extensions: {', '.join(map(str, invalid_extensions))}"
-        )
 
-    # Accept only the paths with valid extensions
-    accepted_paths = [
-        path for path in existing_paths if path.suffix[1:] in valid_extensions
-    ]
+    # Log the valid extensions
+    _log.info(f"Valid extensions: {valid_extensions}")
 
-    # Extract the set of extensions from the accepted paths
-    extensions = set(path.suffix[1:] for path in accepted_paths)
+    # Iterate over all files in the input directory and its subdirectories and print the file paths and suffixes
+    input_doc_paths = []
+    for file in input_dir.rglob("*"):
+        # Check if the file is a file and not a directory and if it has a suffix
+        if file.is_file() and file.suffix:
+            _log.debug(f"File: {file}, Suffix: {file.suffix}")
+            # Check if any parent directory ends with ".chunks"
+            if any(part.endswith('.chunks') for part in file.parts):
+                _log.debug(f"File {file} is in a .chunks directory, skipping.")
+                continue
+            # Check if the file has a valid extension
+            if file.suffix[1:] in valid_extensions:
+                _log.debug(f"File {file} has a valid extension: {file.suffix}")
+                if not is_processed(file):
+                    _log.debug(f"File {file} has not been processed, adding to input_doc_paths.")
+                    # Add the file to the list of input document paths
+                    input_doc_paths.append(file)
+            else:
+                _log.debug(f"File {file} has an invalid extension: {file.suffix}")
+
+    # Log the number of input documents
+    _log.info(f"Found {len(input_doc_paths)} input documents in the directory.")
+    # Log the input document paths
+    _log.debug(f"Input document paths: {', '.join(map(str, input_doc_paths))}")
 
     # Create batches of MAX_INPUT_DOCS documents out of the input existing_paths
     batches = [
-        accepted_paths[i : i + MAX_INPUT_DOCS] for i in range(0, len(accepted_paths), MAX_INPUT_DOCS)
+        input_doc_paths[i : i + MAX_INPUT_DOCS] for i in range(0, len(input_doc_paths), MAX_INPUT_DOCS)
     ]
 
     # Log the number of batches created
@@ -298,26 +305,24 @@ def _docling_convert(
 
         # Iterate over the conversion results and categorize them
         for conv_res in conv_results:
+            # Check if the conversion was successful
             if conv_res.status == ConversionStatus.SUCCESS:
-                succesfully_converted_documents.append(conv_res.input.file)
                 export_document(
                     conv_res,
                     output_dir=output_dir,
                 )
+                succesfully_converted_documents.append(conv_res.input.file)
+                # Mark the file as processed by creating a file with the same name + "{hash}" in the same directory
+                mark_file_processed(conv_res.input.file)
+            # Check the conversion status and categorize accordingly
             elif conv_res.status == ConversionStatus.PARTIAL_SUCCESS:
                 partially_converted_documents.append(conv_res.input.file)
             else:
                 failed_documents.append(conv_res.input.file)
 
-    # Log the non-existing paths
-    if non_existing_paths:
-        _log.warning(
-            f"The following input document paths do not exist: {', '.join(map(str, non_existing_paths))}"
-        )
     # Log the total number of documents processed
     _log.info(
-        f"Processed a total of {len(input_doc_paths)} documents, "
-        f"of which {len(existing_paths)} existed and {len(non_existing_paths)} did not."
+        f"Processed a total of {len(input_doc_paths)} documents"
     )
     # Return the counts of successful, partial success, and failure
     success_count = len(succesfully_converted_documents)
@@ -356,36 +361,22 @@ def main():
     )
     
     parser.add_argument(
-        '--basedir',
+        '--inputdir',
         required=True,
-        help='Path to the base directory'
-    )
-
-    parser.add_argument(
-        'files',
-        nargs='+',
-        help='List of input files'
+        help='Path to the input directory'
     )
     
     args = parser.parse_args()
 
+    print(f"Input directory: {args.inputdir}")
     print(f"Output directory: {args.outputdir}")
-    print(f"Base directory: {args.basedir}")
-    print("Files:")
-    for file in args.files:
-        print(f"  - {file}")
-
-    # Generate input document paths from command line arguments
-    input_doc_paths = [
-        os.path.join(args.basedir, file) for file in args.files
-    ]
 
     # Start the timer
     start_time = time.time()
 
     # Convert the documents
     success, partial_success, failure = _docling_convert(
-        input_doc_paths,
+        input_dir=Path(args.inputdir),
         output_dir=Path(args.outputdir),
     )
 
