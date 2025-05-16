@@ -1,17 +1,16 @@
 # PIPELINE DEFINITION
-# Name: docling-converter
+# Name: docling-chunker
 # Inputs:
-#    input_dir: str
+#    inut_dir: str
 #    output_dir: str
 # Outputs:
 #    Output: str
 components:
-  comp-docling-converter:
-    executorLabel: exec-docling-converter
+  comp-docling-chunker:
+    executorLabel: exec-docling-chunker
     inputDefinitions:
       parameters:
-        input_dir:
-          description: Directory containing the input documents.
+        inut_dir:
           parameterType: STRING
         output_dir:
           description: Directory to save the converted documents.
@@ -22,13 +21,13 @@ components:
           parameterType: STRING
 deploymentSpec:
   executors:
-    exec-docling-converter:
+    exec-docling-chunker:
       container:
         args:
         - --executor_input
         - '{{$}}'
         - --function_to_execute
-        - docling_converter
+        - docling_chunker
         command:
         - sh
         - -c
@@ -39,9 +38,9 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/docling_converter:v1.0.4
+        image: quay.io/atarazana/docling_chunker:v1.0.1
 pipelineInfo:
-  name: docling-converter
+  name: docling-chunker
 root:
   dag:
     outputs:
@@ -49,25 +48,24 @@ root:
         Output:
           valueFromParameter:
             outputParameterKey: Output
-            producerSubtask: docling-converter
+            producerSubtask: docling-chunker
     tasks:
-      docling-converter:
+      docling-chunker:
         cachingOptions:
           enableCache: true
         componentRef:
-          name: comp-docling-converter
+          name: comp-docling-chunker
         inputs:
           parameters:
-            input_dir:
-              componentInputParameter: input_dir
+            inut_dir:
+              componentInputParameter: inut_dir
             output_dir:
               componentInputParameter: output_dir
         taskInfo:
-          name: docling-converter
+          name: docling-chunker
   inputDefinitions:
     parameters:
-      input_dir:
-        description: Directory containing the input documents.
+      inut_dir:
         parameterType: STRING
       output_dir:
         description: Directory to save the converted documents.

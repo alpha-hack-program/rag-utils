@@ -1,6 +1,4 @@
 import os
-
-import os
 import json
 import logging
 
@@ -8,35 +6,18 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from docling_core.types.doc import ImageRefMode
+from docling.chunking import (
+    HybridChunker
+)
+
+from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
+from transformers import AutoTokenizer
 
 from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import (
-    AcceleratorDevice,
-    AcceleratorOptions,
-    PdfPipelineOptions,
-)
-from docling.document_converter import DocumentConverter, FormatOption, PdfFormatOption, HTMLFormatOption, MarkdownFormatOption
-from docling.datamodel.base_models import ConversionStatus, InputFormat
-from docling.datamodel.document import ConversionResult
-from docling.datamodel.pipeline_options import PipelineOptions, PdfPipelineOptions
-from docling.pipeline.simple_pipeline import SimplePipeline
-from docling.pipeline.standard_pdf_pipeline import StandardPdfPipeline
-from docling.backend.asciidoc_backend import AsciiDocBackend
-from docling.backend.docling_parse_v2_backend import DoclingParseV2DocumentBackend
-from docling.backend.html_backend import HTMLDocumentBackend
-from docling.backend.json.docling_json_backend import DoclingJSONBackend
-from docling.backend.md_backend import MarkdownDocumentBackend
-from docling.backend.msexcel_backend import MsExcelDocumentBackend
-from docling.backend.mspowerpoint_backend import MsPowerpointDocumentBackend
-from docling.backend.msword_backend import MsWordDocumentBackend
-from docling.backend.xml.uspto_backend import PatentUsptoDocumentBackend
+from docling.datamodel.document import DoclingDocument
 
-from shared.kubeflow import get_token
+from shared.rag_utils import is_chunked, mark_file_chunked
 
-from kfp import compiler
-
-from kfp.dsl import Output, Metrics, OutputPath
 from kfp import dsl
 
 NAMESPACE = os.environ.get("NAMESPACE", "default")
@@ -53,14 +34,14 @@ DOCLING_PIP_VERSION="2.31.0"
 # MAX_INPUT_DOCS is the value of MAX_INPUT_DOCS environment variable or 20
 MAX_INPUT_DOCS = int(os.environ.get("MAX_INPUT_DOCS", 2))
 
+# Chunker settings
+TOKENIZER_EMBED_MODEL_ID = os.environ.get("TOKENIZER_EMBED_MODEL_ID", None) # "sentence-transformers/all-MiniLM-L6-v2"
+TOKENIZER_MAX_TOKENS = int(os.environ.get("TOKENIZER_MAX_TOKENS", "200")) # 200
+
 # Acceptable input formats with extensions and their corresponding FormatOption
 # for example: InputFormat.PDF (["pdf", "PDF"]) -> PdfFormatOption
 ALLOWED_INPUT_FORMATS = {
-    InputFormat.PDF: [ "pdf", "PDF"],
-    InputFormat.DOCX: ["docx", "DOCX"],
-    InputFormat.PPTX: ["pptx", "PPTX"],
-    InputFormat.MD: ["md","MD"],
-    InputFormat.HTML: ["html","HTML"],
+    InputFormat.JSON_DOCLING: ["json","JSON"],
 }
 
 # Allowed log levels
@@ -75,164 +56,181 @@ logging.getLogger('docling').setLevel(logging.ERROR)
 # Create a logger for this module
 _log = logging.getLogger(__name__)
 
-def export_document(
-    conv_result: ConversionResult,
-    output_dir: Path,
-) -> bool:
-    """
-    Export the converted documents to the specified output directory.
-    Args:
-        conv_result: ConversionResult: The conversion result object containing the conversion status and document.
-        output_dir (Path): Directory to save the converted documents.
-    Returns:
-        Tuple[int, int, int]: Counts of successful, partially successful, and failed conversions.
-    """
-
-    # Log entry
-    _log.debug(f">>> Exporting documents to {output_dir}")
-
-    # Create the output directory if it doesn't exist
-    output_dir.mkdir(parents=True, exist_ok=True)
+def create_hybrid_chunker(
+    tokenizer_embed_model_id: str = None,
+    tokenizer_max_tokens: int = None,
+    merge_peers: bool = True,
+) -> HybridChunker:
+    """Create a HybridChunker with the specified parameters."""
     
-    # Check the conversion status and handle accordingly
-    if conv_result.status == ConversionStatus.SUCCESS:
-        doc_filename = conv_result.input.file.stem
+    # If the tokenizer_embed_model_id is None create a default HybridChunker
+    if tokenizer_embed_model_id is None:
+        # Create a default tokenizer
+        return HybridChunker()
 
-        # Log the file converted and the output file path
-        logging.info(
-            f"Document {conv_result.input.file} converted successfully. "
-            f"Output file: {output_dir / f'{doc_filename}.json'}"
+    # Create the tokenizer
+    _tokenizer = AutoTokenizer.from_pretrained(tokenizer_embed_model_id)
+    tokenizer = None
+
+    # Create a Tokenizer with the specified model ID and max tokens only if max_tokens is not None
+    if tokenizer_max_tokens is not None:
+        tokenizer = HuggingFaceTokenizer(
+            tokenizer=_tokenizer,
+            max_tokens=tokenizer_max_tokens,
+        )
+    else:
+        # Create a default tokenizer    
+        tokenizer = HuggingFaceTokenizer(
+            tokenizer=_tokenizer,
         )
 
-        if conv_result.document:
-            conv_result.document.save_as_json(
-                output_dir / f"{doc_filename}.json",
-                image_mode=ImageRefMode.PLACEHOLDER,
-            )
-            conv_result.document.save_as_doctags(
-                output_dir / f"{doc_filename}.doctags.txt"
-            )
-            conv_result.document.save_as_markdown(
-                output_dir / f"{doc_filename}.md",
-                image_mode=ImageRefMode.PLACEHOLDER,
-            )
-        else:
-            _log.error(
-                f"Document {conv_result.input.file} was converted but no document was created."
-            )
-            with (output_dir / f"{doc_filename}.json").open("w") as fp:
-                json.dump(conv_result.to_dict(), fp, indent=2)
-            return False
-
-    return True
-
-def get_allowed_list_of_input_formats() -> list[InputFormat]:
+    # Create a HierarchicalChunker with the specified chunk size and merge list items
+    chunker = HybridChunker(
+        tokenizer=tokenizer,
+        merge_peers=merge_peers,  # optional, defaults to True
+    )
+    
+    return chunker
+    
+def chunk_batch(
+    batch: list[Path],
+    chunker: HybridChunker,
+    input_dir: Path,
+    output_dir: Path,
+    raises_on_error: bool = False,
+) -> tuple[dict, list[Path]]:
     """
-    Get the allowed input formats.
-    Returns:
-        list[InputFormat]: List of allowed input formats.
-    """
-    return list(ALLOWED_INPUT_FORMATS.keys())
-
-def generate_format_options(
-    extensions: set[str],   
-    pipeline_options: PipelineOptions     
-) -> dict[InputFormat, FormatOption]:
-    """
-    Generate format options based on the provided extensions.
+    Chunk a batch of documents using the specified chunker. Returns a dictionary with the chunks per document.
+    The chunked documents are saved in the specified output directory.
+    If an error occurs, the document is added to the failed documents list.
     Args:
-        extensions (set[str]): Set of file extensions.
+        batch (list[Path]): List of document paths to chunk.
+        chunker (HybridChunker): The chunker to use for chunking.
+        output_dir (Path): The directory to save the chunked documents.
+        raises_on_error (bool): Whether to raise an error on failure. Defaults to False.
     Returns:
-        dict[InputFormat, FormatOption]: Dictionary mapping InputFormat to FormatOption.
+        tuple[dict, list[Path]]: A tuple containing:
+            - Dictionary of # of chunks per document.
+            - List of failed documents.
     """
     
-    format_options = {}
-    for ext in extensions:
-        for fmt, _ext in ALLOWED_INPUT_FORMATS.items():
-            if ext in _ext:
-                if ext in ALLOWED_INPUT_FORMATS[InputFormat.PDF]:
-                    format_options[fmt] = PdfFormatOption(
-                        pipeline_options=pipeline_options
-                    )
-                elif ext in ALLOWED_INPUT_FORMATS[InputFormat.DOCX]:
-                    format_options[fmt] = FormatOption()
-                elif ext in ALLOWED_INPUT_FORMATS[InputFormat.PPTX]:
-                    format_options[fmt] = FormatOption(
-                        pipeline_options=pipeline_options
-                    )
-                elif ext in ALLOWED_INPUT_FORMATS[InputFormat.MD]:
-                    format_options[fmt] = MarkdownFormatOption(
-                        pipeline_options=pipeline_options
-                    )
-                elif ext in ALLOWED_INPUT_FORMATS[InputFormat.HTML]:
-                    format_options[fmt] = HTMLFormatOption(
-                        pipeline_options=pipeline_options
-                    )
-                else:
-                    raise ValueError(
-                        f"Unsupported file extension: {ext}. Supported extensions are: {', '.join(ALLOWED_INPUT_FORMATS[fmt])}"
-                    )
+    # List of successfully chunked documents
+    chunked_documents = {}
+    # List of failed documents
+    failed_documents = []
 
-    return format_options
+    # Iterate over the documents in the batch
+    for doc_file in batch:
+        try:
+            # Extract the relative path of the directory the document file is in compared to the input directory
+            doc_relative_path = doc_file.relative_to(input_dir).parent
 
-# Function to convert documents using Docling
-# This function takes a list of input document paths and an output directory
-# and converts the documents using the specified pipeline options.
-def _docling_convert(
-    input_doc_paths: list[str],
+            # Skip the file if it has already been chunk
+            if is_chunked(doc_file):
+                _log.debug(f"File {doc_file} has already been chunked. Skipping.")
+                continue
+
+            # Create a Document object from the file
+            doc = DoclingDocument.load_from_json(doc_file)
+
+            # Log the document file path
+            _log.info(f"Chunking document: {doc_file}")
+            
+            # Get the hash of the document
+            doc_hash = doc.origin.binary_hash
+
+            # Chunk the document
+            chunks = chunker.chunk(doc, output_dir=output_dir)
+
+            # Create a directory with the name of the document + hash + .chunks
+            doc_name = doc_file.stem
+            chunks_dir = output_dir / doc_relative_path / f"{doc_name}-{doc_hash}.chunks"
+            chunks_dir.mkdir(parents=True, exist_ok=True)
+
+            # Save the chunks in the output directory
+            number_of_chunks = 0
+            for i, chunk in enumerate(chunks):
+                number_of_chunks += 1
+                chunk_file = chunks_dir / f"{doc_name}_chunk_{i}.json"
+                with open(chunk_file, "w") as f:
+                    f.write(chunk.model_dump_json())
+                chunk_with_context = chunks_dir / f"{doc_name}_chunk_{i}.ctxt"
+                with open(chunk_with_context, "w") as f:
+                    f.write(chunker.contextualize(chunk=chunk))
+
+            # Add the number of chunks to the dictionary
+            chunked_documents[doc_file] = number_of_chunks
+
+            # Mark the document as chunked
+            mark_file_chunked(doc_file)
+            _log.info(f"Document {doc_file} chunked successfully. Number of chunks: {number_of_chunks}")
+                
+        except Exception as e:
+            # Log the error and add the document to the failed list
+            _log.error(f"Failed to chunk document {doc_file}: {e}")
+            failed_documents.append(doc_file)
+            if raises_on_error:
+                raise e
+
+    return chunked_documents, failed_documents
+
+def _docling_chunker(
+    input_dir: Path,
     output_dir: Path
-) -> tuple[list[str], list[str], list[str]]:
-    # Log input document paths
-    _log.info(f"Input document paths: {', '.join(input_doc_paths)}")
+) -> tuple[list[str], list[str]]:
+    """
+    Chunk documents using the Docling chunker.
+    Args:
+        input_dir (Path): Directory containing the documents to chunk.
+        output_dir (Path): Directory to save the chunked documents.
+    Returns:
+        tuple[list[str], list[str]]: A tuple containing:
+            - List of successfully chunked documents.
+            - List of failed documents.
+    """
+    # Log input directory
+    _log.info(f"Input directory: {input_dir}")
     # Log output directory
     _log.info(f"Output directory: {output_dir}")
-    
-    # Raise value errors if the input document paths are empty or invalid
-    if not input_doc_paths:
-        raise ValueError("No input document paths provided.")
 
-    # Check if input_doc_paths is a list of strings
-    if not all(isinstance(path, str) for path in input_doc_paths):
-        raise ValueError("Some input document paths are not strings.")
-
-    # Check if all input document paths exist and separate them non existing paths and existing paths
-    input_doc_paths = [Path(path) for path in input_doc_paths]
-    non_existing_paths = [path for path in input_doc_paths if not path.exists()]
-    existing_paths = [path for path in input_doc_paths if path.exists()]
-
-    # Log the non-existing paths
-    if non_existing_paths:
-        _log.warning(
-            f"The following input document paths do not exist: {', '.join(map(str, non_existing_paths))}"
-        )
-
-    # Convert existing_paths to a list of Path objects
-    existing_paths = [Path(path) for path in existing_paths]
+    # Check if the input directory exists
+    if not input_dir.exists():
+        _log.error(f"Input directory {input_dir} does not exist.")
+        raise FileNotFoundError(f"Input directory {input_dir} does not exist.")
 
     # Check if all existing paths have supported extensions and separate them into valid and invalid extensions
     valid_extensions = [
         ext for fmt, exts in ALLOWED_INPUT_FORMATS.items() for ext in exts
     ]
-    invalid_extensions = [
-        path for path in existing_paths if path.suffix[1:] not in valid_extensions
-    ]
-    if invalid_extensions:
-        # Log the invalid extensions
-        _log.info(
-            f"The following input document paths have unsupported extensions: {', '.join(map(str, invalid_extensions))}"
-        )
 
-    # Accept only the paths with valid extensions
-    accepted_paths = [
-        path for path in existing_paths if path.suffix[1:] in valid_extensions
-    ]
+    # Log the valid extensions
+    _log.info(f"Valid extensions: {valid_extensions}")
 
-    # Extract the set of extensions from the accepted paths
-    extensions = set(path.suffix[1:] for path in accepted_paths)
+    # Iterate over all files in the input directory and its subdirectories and print the file paths and suffixes
+    input_doc_paths = []
+    for file in input_dir.rglob("*"):
+        # Check if the file is a file and not a directory and if it has a suffix
+        if file.is_file() and file.suffix:
+            _log.debug(f"File: {file}, Suffix: {file.suffix}")
+            # Check if any parent directory ends with ".chunks"
+            if any(part.endswith('.chunks') for part in file.parts):
+                _log.debug(f"File {file} is in a .chunks directory, skipping.")
+                continue
+            # Check if the file has a valid extension
+            if file.suffix[1:] in valid_extensions:
+                _log.debug(f"File {file} has a valid extension: {file.suffix}")
+                input_doc_paths.append(file)
+            else:
+                _log.debug(f"File {file} has an invalid extension: {file.suffix}")
+                
+    # Log the number of input documents
+    _log.info(f"Found {len(input_doc_paths)} input documents in the directory.")
+    # Log the input document paths
+    _log.debug(f"Input document paths: {', '.join(map(str, input_doc_paths))}")
 
     # Create batches of MAX_INPUT_DOCS documents out of the input existing_paths
     batches = [
-        accepted_paths[i : i + MAX_INPUT_DOCS] for i in range(0, len(accepted_paths), MAX_INPUT_DOCS)
+        input_doc_paths[i : i + MAX_INPUT_DOCS] for i in range(0, len(input_doc_paths), MAX_INPUT_DOCS)
     ]
 
     # Log the number of batches created
@@ -247,110 +245,52 @@ def _docling_convert(
                 f"Batch {i + 1}: {', '.join(map(str, batch))}"
             )
 
-    # Create PipelineOptions
-    pipeline_options = PdfPipelineOptions()
-    pipeline_options.accelerator_options = AcceleratorOptions(
-        num_threads=4, device=AcceleratorDevice.AUTO
-    )
-    pipeline_options.do_ocr = True
-    pipeline_options.do_table_structure = True
-    pipeline_options.table_structure_options.do_cell_matching = True
-
-    # Create the format options for the converter
-    format_options = {
-        InputFormat.XLSX: FormatOption(
-            pipeline_cls=SimplePipeline, backend=MsExcelDocumentBackend
-        ),
-        InputFormat.DOCX: FormatOption(
-            pipeline_cls=SimplePipeline, backend=MsWordDocumentBackend
-        ),
-        InputFormat.PPTX: FormatOption(
-            pipeline_cls=SimplePipeline, backend=MsPowerpointDocumentBackend
-        ),
-        InputFormat.MD: FormatOption(
-            pipeline_cls=SimplePipeline, backend=MarkdownDocumentBackend
-        ),
-        InputFormat.ASCIIDOC: FormatOption(
-            pipeline_cls=SimplePipeline, backend=AsciiDocBackend
-        ),
-        InputFormat.HTML: FormatOption(
-            pipeline_cls=SimplePipeline, backend=HTMLDocumentBackend
-        ),
-        InputFormat.XML_USPTO: FormatOption(
-            pipeline_cls=SimplePipeline, backend=PatentUsptoDocumentBackend
-        ),
-        InputFormat.IMAGE: FormatOption(
-            pipeline_cls=StandardPdfPipeline, backend=DoclingParseV2DocumentBackend
-        ),
-        InputFormat.PDF: PdfFormatOption(
-            pipeline_options=pipeline_options
-        ),
-        InputFormat.JSON_DOCLING: FormatOption(
-            pipeline_cls=SimplePipeline, backend=DoclingJSONBackend
-        ),
-    }
-
-    # Create the DocumentConverter with the format options
-    converter = DocumentConverter(
-        allowed_formats=get_allowed_list_of_input_formats(),
-        format_options=format_options
-    )
-
     # Create the output directory if it doesn't exist
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # List of successfully converted documents
-    succesfully_converted_documents = []
-    # List of partially converted documents
-    partially_converted_documents = []
+    # List of successfully chunked documents
+    succesfully_chunked_documents = {}
     # List of failed documents
     failed_documents = []
 
+    # Chunker
+    chunker = create_hybrid_chunker(
+        tokenizer_embed_model_id=TOKENIZER_EMBED_MODEL_ID,
+        tokenizer_max_tokens=TOKENIZER_MAX_TOKENS,
+    )
+
     # Convert the documents in batches, use tqdm to show progress
     for batch in tqdm(batches):
-        # Convert the documents in the batch
-        conv_results = converter.convert_all(
-            batch,
+        # Chunk the documents in the batch
+        _chunked_documents, _failed_documents = chunk_batch(
+            batch=batch,
+            chunker=chunker,
+            input_dir=input_dir,
+            output_dir=output_dir,
             raises_on_error=False,  # to let conversion run through all and examine results at the end
         )
 
-        # Iterate over the conversion results and categorize them
-        for conv_res in conv_results:
-            if conv_res.status == ConversionStatus.SUCCESS:
-                succesfully_converted_documents.append(conv_res.input.file)
-                export_document(
-                    conv_res,
-                    output_dir=output_dir,
-                )
-            elif conv_res.status == ConversionStatus.PARTIAL_SUCCESS:
-                partially_converted_documents.append(conv_res.input.file)
-            else:
-                failed_documents.append(conv_res.input.file)
+        # Push the chunked documents to the dictionary of chunked documents
+        succesfully_chunked_documents.update(_chunked_documents)
 
-    # Log the non-existing paths
-    if non_existing_paths:
-        _log.warning(
-            f"The following input document paths do not exist: {', '.join(map(str, non_existing_paths))}"
-        )
+        # Append the failed documents to the list of failed documents
+        failed_documents.extend(_failed_documents)
+        
     # Log the total number of documents processed
     _log.info(
-        f"Processed a total of {len(input_doc_paths)} documents, "
-        f"of which {len(existing_paths)} existed and {len(non_existing_paths)} did not."
+        f"Processed a total of {len(input_doc_paths)} documents"
     )
     # Return the counts of successful, partial success, and failure
-    success_count = len(succesfully_converted_documents)
-    partial_success_count = len(partially_converted_documents)
+    success_count = len(succesfully_chunked_documents)
     failure_count = len(failed_documents)
     # Log the total number of documents processed
     _log.info(
-        f"Processed {success_count + partial_success_count + failure_count} docs, "
-        f"of which {failure_count} failed "
-        f"and {partial_success_count} were partially converted."
+        f"Processed {success_count + failure_count} docs, "
+        f"of which {failure_count} failed"
     )
     # Return the lists of successful, partial success, and failure conversions
     return (
-        succesfully_converted_documents,
-        partially_converted_documents,
+        succesfully_chunked_documents,
         failed_documents,
     )
 
@@ -360,46 +300,52 @@ def _docling_convert(
     target_image=TARGET_IMAGE,
     packages_to_install=[f"docling[vlm]=={DOCLING_PIP_VERSION}", f"load_dotenv=={LOAD_DOTENV_PIP_VERSION}"]
 )
-def docling_converter(
-    input_doc_paths: str,  # Comma-separated list of input document paths
+def docling_chunker(
+    inut_dir: str,
     output_dir: str
 ) -> str:
     """
     Convert documents using Docling.
     Args:
-        input_doc_paths (str): Comma-separated list of input document paths.
+        input_dir (str): Directory containing the documents to convert.
         output_dir (str): Directory to save the converted documents.
     Returns:
         list[str]: Lists of successfully converted
     """
-    # Convert the input document paths from a comma-separated string to a list of strings objects
-    input_doc_paths_list = [path.strip() for path in input_doc_paths.split(",")]
+    # Convert input_dir to a Path object and fail if it can't be converted
+    input_dir = Path(input_dir)
+    if not isinstance(input_dir, Path):
+        raise ValueError(f"Input directory {input_dir} is not a valid path.")
+
+    # Check if the input directory exists
+    if not input_dir.exists():
+        raise FileNotFoundError(f"Input directory {input_dir} does not exist.")
 
     # Convert output_dir to a Path object and fail if it can't be converted
     output_dir = Path(output_dir)
     if not isinstance(output_dir, Path):
         raise ValueError(f"Output directory {output_dir} is not a valid path.")
 
-    # Convert the documents
-    succesfully_converted_documents, partially_converted_documents, failed_documents = _docling_convert(
-        input_doc_paths=input_doc_paths_list,
-        output_dir=output_dir
+    # Convert output_dir to a Path object and fail if it can't be converted
+    output_dir = Path(output_dir)
+    if not isinstance(output_dir, Path):
+        raise ValueError(f"Output directory {output_dir} is not a valid path.")
+
+    # Chunk the documents in the input directory
+    success, failure = _docling_chunker(
+        input_dir=input_dir,
+        output_dir=output_dir,
     )
     
     # return the lists as a json string
     return json.dumps({
-        "success": [str(path) for path in succesfully_converted_documents],
-        "partial_success": [str(path) for path in partially_converted_documents],
-        "failure": [str(path) for path in failed_documents]
+        "success": [str(path) for path in success],
+        "failure": [str(path) for path in failure]
     })
     
 if __name__ == "__main__":
     # Generate and save the component YAML file
     component_package_path = __file__.replace('.py', '.yaml')
 
-    docling_converter.save_component_yaml(component_package_path)
+    docling_chunker.save_component_yaml(component_package_path)
 
-    # compiler.Compiler().compile(
-    #     pipeline_func=docling_converter,
-    #     package_path=component_package_path
-    # )

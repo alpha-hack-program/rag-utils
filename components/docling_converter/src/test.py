@@ -3,7 +3,6 @@ import json
 import logging
 import time
 import argparse
-import hashlib
 
 from pathlib import Path
 
@@ -33,7 +32,7 @@ from docling.backend.mspowerpoint_backend import MsPowerpointDocumentBackend
 from docling.backend.msword_backend import MsWordDocumentBackend
 from docling.backend.xml.uspto_backend import PatentUsptoDocumentBackend
 
-from shared.rag_utils import calculate_md5, is_processed, mark_file_processed
+from shared.rag_utils import is_processed, mark_file_processed
 
 # MAX_INPUT_DOCS is the value of MAX_INPUT_DOCS environment variable or 20
 MAX_INPUT_DOCS = int(os.environ.get("MAX_INPUT_DOCS", 2))
