@@ -301,7 +301,7 @@ def _docling_chunker(
     packages_to_install=[f"docling[vlm]=={DOCLING_PIP_VERSION}", f"load_dotenv=={LOAD_DOTENV_PIP_VERSION}"]
 )
 def docling_chunker(
-    inut_dir: str,
+    input_dir: str,
     output_dir: str
 ) -> str:
     """

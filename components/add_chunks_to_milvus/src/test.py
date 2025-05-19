@@ -5,7 +5,7 @@ import argparse
 
 from pathlib import Path
 
-from docling_converter import _docling_convert
+from add_chunks_to_milvus import _add_chunks_to_milvus
 
 # Allowed log levels
 VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
@@ -30,40 +30,51 @@ def main():
     logging.basicConfig(level=log_level)
 
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description="Parse outputdir, basedir, and a list of files.")
-    
-    parser.add_argument(
-        '--outputdir',
-        required=True,
-        help='Path to the output directory'
-    )
+    parser = argparse.ArgumentParser(description="Parse ...")
     
     parser.add_argument(
         '--inputdir',
         required=True,
         help='Path to the input directory'
     )
+
+    parser.add_argument(
+        '--collection',
+        required=True,
+        help='Milvus Collection Name'
+    )
     
     args = parser.parse_args()
 
     print(f"Input directory: {args.inputdir}")
-    print(f"Output directory: {args.outputdir}")
+
+    # Check environment variables for:
+    # MILVUS_HOST, MILVUS_PORT, MILVUS_USER, MILVUS_PASSWORD
+    # OPENAI_API_KEY, OPENAI_API_BASE, OPENAI_API_VERSION
+    MILVUS_DATABASE = os.getenv("MILVUS_DATABASE")
+    MILVUS_HOST = os.getenv("MILVUS_HOST")
+    MILVUS_PORT = os.getenv("MILVUS_PORT")
+    MILVUS_USER = os.getenv("MILVUS_USER")
+    MILVUS_PASSWORD = os.getenv("MILVUS_PASSWORD")
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    OPENAI_API_EMBEDDINGS_URL = os.getenv("OPENAI_API_BASE")
+    if not all([MILVUS_DATABASE, MILVUS_HOST, MILVUS_PORT, MILVUS_USER, MILVUS_PASSWORD]):
+        raise ValueError("Missing required environment variables for Milvus connection.")
+    if not all([OPENAI_API_KEY, OPENAI_API_EMBEDDINGS_URL]):
+        raise ValueError("Missing required environment variables for OpenAI connection to generate embeddings.")
 
     # Start the timer
     start_time = time.time()
 
-    # Convert the documents
-    success, partial_success, failure = _docling_convert(
+    # Add chunks to Milvus
+    success, failure = _add_chunks_to_milvus(
         input_dir=Path(args.inputdir),
-        output_dir=Path(args.outputdir),
+        milvus_collection_name=args.collection,
     )
 
     # Log the conversion results
     _log.info(
         f"Successfully converted: {success}"
-    )
-    _log.info(
-        f"Partially converted: {partial_success}"
     )
     _log.info(
         f"Failed to convert: {failure}"
@@ -72,7 +83,7 @@ def main():
     # Stop the timer
     end_time = time.time() - start_time
 
-    _log.info(f"Document conversion complete in {end_time:.2f} seconds.")
+    _log.info(f"Chunks insertion complete in {end_time:.2f} seconds.")
     
 if __name__ == "__main__":
     main()

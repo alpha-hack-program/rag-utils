@@ -9,3 +9,6 @@ __pycache__/
 *.db
 .venv
 scratch*/
+.milvus/
+.vscode/
+.test.env

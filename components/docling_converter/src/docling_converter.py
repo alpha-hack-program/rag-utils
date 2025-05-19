@@ -72,6 +72,7 @@ _log = logging.getLogger(__name__)
 
 def export_document(
     conv_result: ConversionResult,
+    input_dir: Path,
     output_dir: Path,
 ) -> bool:
     """
@@ -93,30 +94,48 @@ def export_document(
     if conv_result.status == ConversionStatus.SUCCESS:
         doc_filename = conv_result.input.file.stem
 
+        # Log the document filename
+        _log.debug(f"Document filename: {doc_filename}")
+
+        # Extract the relative path of the directory the document file is in compared to the input directory
+        doc_relative_path = conv_result.input.file.relative_to(input_dir).parent
+
+        # Log the relative path
+        _log.debug(f"Document relative path: {doc_relative_path}")
+
+        # Generate the output directory path
+        doc_path = output_dir / doc_relative_path
+
+        # Log the output directory
+        _log.debug(f"Output directory: {doc_path}")
+
+        # Create the output directory if it doesn't exist
+        doc_path.mkdir(parents=True, exist_ok=True)
+        
         # Log the file converted and the output file path
         logging.info(
             f"Document {conv_result.input.file} converted successfully. "
-            f"Output file: {output_dir / f'{doc_filename}.json'}"
+            f"Writing Docling document to: {doc_path / f'{doc_filename}.json'}"
         )
 
         if conv_result.document:
             conv_result.document.save_as_json(
-                output_dir / f"{doc_filename}.json",
+                doc_path / f"{doc_filename}.json",
                 image_mode=ImageRefMode.PLACEHOLDER,
             )
             conv_result.document.save_as_doctags(
-                output_dir / f"{doc_filename}.doctags.txt"
+                doc_path / f"{doc_filename}.doctags.txt"
             )
             conv_result.document.save_as_markdown(
-                output_dir / f"{doc_filename}.md",
+                doc_path / f"{doc_filename}.md",
                 image_mode=ImageRefMode.PLACEHOLDER,
             )
         else:
             _log.error(
                 f"Document {conv_result.input.file} was converted but no document was created."
             )
-            with (output_dir / f"{doc_filename}.json").open("w") as fp:
-                json.dump(conv_result.to_dict(), fp, indent=2)
+            # with (doc_path / f"{doc_filename}.json").open("w") as fp:
+            #     json.dump(conv_result.to_dict(), fp, indent=2)
             return False
 
     return True
@@ -319,6 +338,7 @@ def _docling_convert(
             if conv_res.status == ConversionStatus.SUCCESS:
                 export_document(
                     conv_res,
+                    input_dir=input_dir,
                     output_dir=output_dir,
                 )
                 succesfully_converted_documents.append(conv_res.input.file)
