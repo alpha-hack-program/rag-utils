@@ -56,6 +56,65 @@ openai_api_key = os.environ.get('OPENAI_API_KEY')
 openai_api_model = os.environ.get('OPENAI_API_MODEL')
 openai_api_embeddings_url = os.environ.get('OPENAI_API_BASE')
 
+def query_milvus(
+    collection_name: str,
+    query_text: str,
+    top_k: int = 5,
+    params: dict = None,
+    timeout: int = 30,
+) -> list:
+    """
+    Perform a vector search on a Milvus collection.
+    """
+    # Connect to Milvus
+    connections.connect(
+        alias="default",
+        host=milvus_host,
+        port=milvus_port,
+        user=milvus_user,
+        password=milvus_password,
+        db_name=milvus_database,
+    )
+
+    if not utility.has_collection(collection_name):
+        raise ValueError(f"Collection {collection_name} does not exist.")
+
+    collection = Collection(collection_name)
+    collection.load()
+
+    # Get query embedding
+    embedding = get_embedding(query_text)
+
+    if params is None:
+        params = {
+            "metric_type": "COSINE",
+            "params": {"ef": 64},  # For HNSW, optional depending on your index
+        }
+
+    # Search
+    results = collection.search(
+        data=[embedding],  # must be a list of vectors
+        anns_field="vector",
+        param=params,
+        limit=top_k,
+        expr=None,  # You can add filtering expressions here if needed
+        output_fields=["id", "content", "source"],
+        timeout=timeout,
+    )
+
+    # Extract the top_k results
+    hits = results[0]  # one query, so results[0] is the list of hits
+    return [
+        {
+            "id": hit.id,
+            "distance": hit.distance,
+            "content": hit.entity.get("content"),
+            "source": hit.entity.get("source"),
+        }
+        for hit in hits
+    ]
+
+
 def check_openai_embeddings_connection():
     """
     Check the connection to OpenAI API using requests.
@@ -178,7 +237,7 @@ def process_document_chunks(
     if not any(document_chunks_path.iterdir()):
         raise ValueError(f"Input directory {document_chunks_path} is empty.")
     # Log the input directory
-    _log.info(f"Processing document chunk directory: {document_chunks_path}")
+    _log.debug(f"Processing document chunk directory: {document_chunks_path}")
     
     # Process chunks for insertion
     embeddings = []
@@ -194,6 +253,7 @@ def process_document_chunks(
     timestamps = []
 
     # Iterate over all the json files in the directory
+    count = 0
     for file in document_chunks_path.rglob("*.json"):
         # Check if the file is a json file
         if file.suffix == ".json":
@@ -209,6 +269,16 @@ def process_document_chunks(
 
             # Compute the content hash
             content_hash = compute_content_hash(contextualized_content)
+
+            # Check if the content hash already exists in the collection
+            existing_hash = milvus_collection.query(
+                expr=f"content_hash == '{content_hash}'",
+                output_fields=["id"],
+                limit=1,
+            )
+            if existing_hash:
+                _log.debug(f"Duplicate content hash found: {content_hash}. Skipping insertion.")
+                continue
 
             # Get the embedding
             embedding = get_embedding(
@@ -247,7 +317,16 @@ def process_document_chunks(
             doc_items.append(doc_items_serialized)  # This is now a list of dicts
             
             timestamps.append(timestamp)
+
+            # Count the number of chunks processed
+            count += 1
             
+    # If no chunks were processed, return
+    if count == 0:
+        # Log the error
+        _log.debug(f"No chunks were processed in {document_chunks_path}.")
+        return
+
     # Insert data into the collection
     entities = [
         embeddings,
@@ -345,8 +424,7 @@ def init(
 
                 # Wait for index
                 _log.info(f"Waiting for vector index on existing collection '{milvus_collection_name}'...")
-                while not collection.has_index():
-                    time.sleep(1)
+                wait_for_index(collection, "vector_index")
 
         # Load collection
         collection.load()
@@ -395,16 +473,21 @@ def _create_collection(
     _create_indexes(collection)
 
    # Wait for the index to be ready
-    _log.info(f"Waiting for vector index on collection '{milvus_collection_name}' to be ready...")
-    while not collection.has_index():
-        _log.info(f"Index not ready yet for '{milvus_collection_name}'. Waiting...")
-        time.sleep(1)
-    _log.info(f"Vector index ready for '{milvus_collection_name}'.")
+    wait_for_index(collection, "vector_index")
 
     # Now load the collection
     collection.load()
     
     return collection
+
+def wait_for_index(collection, index_name: str, sleep_seconds: int = 1):
+    while True:
+        try:
+            collection.describe_index(index_name=index_name)
+            return
+        except Exception as e:
+            _log.info(f"Waiting for index '{index_name}': {e}")
+            time.sleep(sleep_seconds)
 
 def _create_indexes(collection):
     """
