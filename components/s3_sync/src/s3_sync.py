@@ -3,7 +3,6 @@ import boto3
 import hashlib
 import json
 
-from kfp import compiler
 from kfp import dsl
 
 NAMESPACE = os.environ.get("NAMESPACE", "default")
@@ -174,11 +173,8 @@ def s3_sync(
     # return the list as a json string
     return json.dumps(list_of_files)
     
-
-
 if __name__ == "__main__":
+    # Generate and save the component YAML file
     component_package_path = __file__.replace('.py', '.yaml')
-    compiler.Compiler().compile(
-        pipeline_func=s3_sync,
-        package_path=component_package_path
-    )
+
+    s3_sync.save_component_yaml(component_package_path)

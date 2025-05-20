@@ -1,6 +1,5 @@
 import os
 
-from kfp import compiler
 from kfp import dsl
 
 from kubernetes import client
@@ -121,8 +120,8 @@ def setup_storage(
         raise RuntimeError(f"Failed to create PVC: {e.reason}")
 
 if __name__ == "__main__":
+    # Generate and save the component YAML file
     component_package_path = __file__.replace('.py', '.yaml')
-    compiler.Compiler().compile(
-        pipeline_func=s3_sync_component,
-        package_path=component_package_path
-    )
+
+    setup_storage.save_component_yaml(component_package_path)
+
