@@ -1,12 +1,10 @@
-from cmd import PROMPT
 import os
 import logging
 import time
 import argparse
+import requests
 
 from pathlib import Path
-
-import requests
 
 from add_chunks_to_milvus import _add_chunks_to_milvus, query_milvus
 
