@@ -16,6 +16,13 @@ LOAD_DOTENV_PIP_VERSION = "0.1.0"
 BOTOCORE_PIP_VERSION = "1.35.54"
 BOTO3_PIP_VERSION = "1.35.54"
 
+# Get the S3 connection details AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_DEFAULT_REGION', 'AWS_S3_BUCKET', 'AWS_S3_ENDPOINT'
+aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
+aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
+aws_default_region = os.environ.get('AWS_DEFAULT_REGION')
+aws_s3_bucket = os.environ.get('AWS_S3_BUCKET')
+aws_s3_endpoint = os.environ.get('AWS_S3_ENDPOINT')
+
 def compute_md5(file_path: str, chunk_size: int = 4096) -> str:
     """
     Computes the MD5 hash of a file.
@@ -133,35 +140,43 @@ def _s3_sync(
     ]
 )
 def s3_sync(
-        endpoint_url: str,
-        region_name: str,
-        bucket_name: str,
-        aws_access_key_id: str,
-        aws_secret_access_key: str,
         folder: str,
         root_mount_path: str,
         local_folder: str,
         force: bool = False,
 ) -> str:
-    print(f"Syncing files from {bucket_name}/{folder} to {local_folder}")
-    print(f"force = {force}")
-    
-    if not endpoint_url or not bucket_name or not aws_access_key_id or not aws_secret_access_key or not folder:
+    """
+    Sync files from S3 to local storage.
+    :param folder: S3 folder to sync from.
+    :param root_mount_path: Local root mount path.
+    :param local_folder: Local folder to sync to.
+    :param force: Force download even if the file exists locally.
+    :return: List of downloaded files.
+    """
+
+    # If aws variables are not set, retur an error
+    if not aws_access_key_id or not aws_secret_access_key or not aws_default_region or not aws_s3_bucket or not aws_s3_endpoint:
         raise ValueError("One or more required parameters for S3 interaction are not set")
+
+    # If not root_mount_path or not local_folder, return an error
     if not root_mount_path or not local_folder:
         raise ValueError("One or more required parameters for local interaction are not set")
 
-    if not root_mount_path or not os.path.exists(root_mount_path):
+    # If root_mount_path does not exist, return an error
+    if not os.path.exists(root_mount_path):
         raise ValueError(f"Root mount path '{root_mount_path}' does not exist")
 
+    print(f"Syncing files from {aws_s3_bucket}/{folder} to {local_folder}")
+    print(f"force = {force}")    
+    
     local_folder_path = os.path.join(root_mount_path, local_folder)
     if not os.path.exists(local_folder_path):
         os.makedirs(local_folder_path)
 
     list_of_files = _s3_sync(
-        endpoint_url,
-        region_name,
-        bucket_name,
+        aws_s3_endpoint,
+        aws_default_region,
+        aws_s3_bucket,
         aws_access_key_id,
         aws_secret_access_key,
         folder,
