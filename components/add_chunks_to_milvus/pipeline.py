@@ -18,10 +18,10 @@ def pipeline(
     local_folder: str = "collections",
     force: bool = False):
 
-    # Sync files from S3 to local
+    # Add chunks to Milvus
     add_chunks_to_milvus_task = add_chunks_to_milvus(
         input_dir=f"{root_mount_path}/{local_folder}",
-        milvus_collection_name="test_collection",
+        milvus_collection_name=milvus_collection_name,
     ).set_caching_options(False)
 
 if __name__ == '__main__':

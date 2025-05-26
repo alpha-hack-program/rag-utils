@@ -13,13 +13,13 @@ print(f"COMPONENT_NAME: {COMPONENT_NAME}")
 # upload the model to another S3 bucket.
 @dsl.pipeline(name=os.path.basename(__file__).replace('.py', ''))
 def pipeline(
-    input_doc_paths: str = "/usr/local/src/kfp/components/tests/data/2203.01017v2.pdf,/usr/local/src/kfp/components/tests/data/GenAI_POC_Process_Guidebook.docx",
-    output_dir: str = "/tmp/docling-converter"    
+    input_dir: str = "/tmp/input",
+    output_dir: str = "/tmp/output",
 ):
 
     # Convert documents to JSON(docling format) and markdown
-    train_model_task = docling_converter(
-       input_doc_paths=input_doc_paths,
+    docling_converter_task = docling_converter(
+        input_dir=input_dir,
         output_dir=output_dir, 
     ).set_caching_options(False)
 
