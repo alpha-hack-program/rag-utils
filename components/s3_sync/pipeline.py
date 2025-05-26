@@ -13,11 +13,6 @@ print(f"COMPONENT_NAME: {COMPONENT_NAME}")
 # upload the model to another S3 bucket.
 @dsl.pipeline(name=os.path.basename(__file__).replace('.py', ''))
 def pipeline(
-    endpoint_url: str = "http://minio.minio.svc.cluster.local:9000",
-    region_name: str = "none",
-    bucket_name: str = "documents",
-    aws_access_key_id: str = "minio",
-    aws_secret_access_key: str = "minio123",
     folder: str = "collections",
     root_mount_path: str = "/tmp",
     local_folder: str = "collections",
@@ -25,11 +20,6 @@ def pipeline(
 
     # Sync files from S3 to local
     s3_sync_task = s3_sync(
-        endpoint_url=endpoint_url,
-        region_name=region_name,
-        bucket_name=bucket_name,
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
         folder=folder,
         root_mount_path=root_mount_path,
         local_folder=local_folder,
