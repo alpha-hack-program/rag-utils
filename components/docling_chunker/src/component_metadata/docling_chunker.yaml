@@ -1,7 +1,7 @@
 # PIPELINE DEFINITION
 # Name: docling-chunker
 # Inputs:
-#    inut_dir: str
+#    input_dir: str
 #    output_dir: str
 # Outputs:
 #    Output: str
@@ -10,7 +10,8 @@ components:
     executorLabel: exec-docling-chunker
     inputDefinitions:
       parameters:
-        inut_dir:
+        input_dir:
+          description: Directory containing the documents to convert.
           parameterType: STRING
         output_dir:
           description: Directory to save the converted documents.
@@ -57,15 +58,16 @@ root:
           name: comp-docling-chunker
         inputs:
           parameters:
-            inut_dir:
-              componentInputParameter: inut_dir
+            input_dir:
+              componentInputParameter: input_dir
             output_dir:
               componentInputParameter: output_dir
         taskInfo:
           name: docling-chunker
   inputDefinitions:
     parameters:
-      inut_dir:
+      input_dir:
+        description: Directory containing the documents to convert.
         parameterType: STRING
       output_dir:
         description: Directory to save the converted documents.

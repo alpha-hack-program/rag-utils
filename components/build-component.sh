@@ -31,7 +31,20 @@ export PYTHONPATH=${PYTHONPATH}:$(pwd)/${COMPONENT_NAME}/src:$(pwd)/shared
 # Build the component using the kfp CLI
 kfp component build ${COMPONENT_NAME}/src/ --component-filepattern ${COMPONENT_NAME}.py --no-push-image --no-build-image
 
+# Determine whether to use cache
+CACHE_FLAG=""
+if [ "${BUILD_COMPONENT_NOCACHE}" = true ]; then
+  echo "Building component ${COMPONENT_NAME} with no cache"
+  CACHE_FLAG="--no-cache"
+else
+  echo "Building component ${COMPONENT_NAME} with cache"
+fi
+
 # Build the image using the BASE_IMAGE build arg
-podman build -t ${COMPONENT_NAME}:${TAG} -f ${CONTAINER_FILE} . \
-  --build-arg BASE_IMAGE=${BASE_IMAGE} \
-  --build-arg COMPONENT_NAME=${COMPONENT_NAME}
+podman build ${CACHE_FLAG} \
+  -t "${COMPONENT_NAME}:${TAG}" \
+  -f "${CONTAINER_FILE}" . \
+  --build-arg BASE_IMAGE="${BASE_IMAGE}" \
+  --build-arg COMPONENT_NAME="${COMPONENT_NAME}"
+
+
