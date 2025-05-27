@@ -3,25 +3,45 @@
 # Pipeline to load documents from an S3 bucket into Milvus using pymilvus => mv
 
 import os
+from pathlib import Path
 
 from kfp import dsl
 
 from kfp import kubernetes
 from kfp.components import load_component_from_file
 
-from components.setup_storage import setup_storage as setup_storage_component
-from components.s3_sync import s3_sync as s3_sync_component
-from components.docling_converter import docling_converter as docling_converter_component
-from components.docling_chunker import docling_chunker as docling_chunker_component
-from components.add_chunks_to_milvus import add_chunks_to_milvus as add_chunks_to_milvus_component
+# from setup_storage import setup_storage as setup_storage_component
+# from s3_sync import s3_sync as s3_sync_component
+# from docling_converter import docling_converter as docling_converter_component
+# from docling_chunker import docling_chunker as docling_chunker_component
+# from add_chunks_to_milvus import add_chunks_to_milvus as add_chunks_to_milvus_component
 
 # # Load the register model from a url
 # REGISTER_MODEL_COMPONENT_URL = "https://raw.githubusercontent.com/alpha-hack-program/model-serving-utils/refs/heads/main/components/register_model/src/component_metadata/register_model.yaml"
 # register_model_component = kfp.components.load_component_from_url(REGISTER_MODEL_COMPONENT_URL)
 
-# Load train_yolo component
-# SETUP_STORAGE_COMPONENT_FILE_PATH='components/setup_storage/src/component_metadata/setup_storage.yaml'
-# setup_storage_component = load_component_from_file(SETUP_STORAGE_COMPONENT_FILE_PATH)
+# Get the path to parent of the parent directory of the current file
+COMPONENTS_DIR = Path(__file__).parent.parent / "components"
+
+# Load setup_storage component
+SETUP_STORAGE_COMPONENT_FILE_PATH=f'{COMPONENTS_DIR}/setup_storage/src/component_metadata/setup_storage.yaml'
+setup_storage_component = load_component_from_file(SETUP_STORAGE_COMPONENT_FILE_PATH)
+
+# Load s3_sync component
+S3_SYNC_COMPONENT_FILE_PATH=f'{COMPONENTS_DIR}/s3_sync/src/component_metadata/s3_sync.yaml'
+s3_sync_component = load_component_from_file(S3_SYNC_COMPONENT_FILE_PATH)
+
+# Load docling_converter component
+DOCLING_CONVERTER_COMPONENT_FILE_PATH=f'{COMPONENTS_DIR}/docling_converter/src/component_metadata/docling_converter.yaml'
+docling_converter_component = load_component_from_file(DOCLING_CONVERTER_COMPONENT_FILE_PATH)
+
+# Load docling_chunker component
+DOCLING_CHUNKER_COMPONENT_FILE_PATH=f'{COMPONENTS_DIR}/docling_chunker/src/component_metadata/docling_chunker.yaml'
+docling_chunker_component = load_component_from_file(DOCLING_CHUNKER_COMPONENT_FILE_PATH)
+
+# Load add_chunks_to_milvus component
+ADD_CHUNKS_TO_MILVUS_COMPONENT_FILE_PATH=f'{COMPONENTS_DIR}/add_chunks_to_milvus/src/component_metadata/add_chunks_to_milvus.yaml'
+add_chunks_to_milvus_component = load_component_from_file(ADD_CHUNKS_TO_MILVUS_COMPONENT_FILE_PATH)
 
 # This pipeline will download evaluation data, download the model, test the model and if it performs well, 
 # upload the model to the runtime S3 bucket and refresh the runtime deployment.
@@ -56,33 +76,32 @@ def pipeline(
         force=force
     ).after(setup_storage_task).set_display_name("s3_sync").set_caching_options(False)
 
-    # Set document input and output directories
-    documents_input_dir = root_mount_path / documents_dir_name
-    converted_output_dir = root_mount_path / converted_dir_name
-
     # Convert documents using docling
     docling_converter_task = docling_converter_component(
-        input_dir=documents_input_dir,
-        output_dir=converted_output_dir,
+        root_mount_path=root_mount_path,
+        input_dir_name=documents_dir_name, # documents_input_dir
+        output_dir_name=converted_dir_name, # converted_output_dir
     ).after(s3_sync_task).set_display_name("docling_converter").set_caching_options(False)
-
-    # Set document input and output directories
-    converted_input_dir = root_mount_path / converted_dir_name
-    chunks_output_dir = root_mount_path / chunks_dir_name
+    # # Convert documents using docling
+    # docling_converter_task = docling_converter_component(
+    #     input_dir=f"{root_mount_path}/{documents_dir_name}", # documents_input_dir
+    #     output_dir=f"{root_mount_path}/{converted_dir_name}", # converted_output_dir
+    # ).after(s3_sync_task).set_display_name("docling_converter").set_caching_options(False)
 
     # Chunk documents using docling
     docling_chunker_task = docling_chunker_component(
-        input_dir=converted_input_dir,
-        output_dir=chunks_output_dir,
+        root_mount_path=root_mount_path,
+        input_dir_name=converted_dir_name, # converted_dir_name
+        output_dir_name=chunks_dir_name, # chunks_output_dir
     ).after(docling_converter_task).set_display_name("docling_chunker").set_caching_options(False)
 
     # Add chunks to vector store
     add_chunks_to_vector_store_task = add_chunks_to_milvus_component(
-        input_dir=chunks_output_dir,
+        root_mount_path=root_mount_path,
+        input_dir_name=chunks_dir_name, # chunks_dir_name
         milvus_collection_name=milvus_collection_name,
     ).after(docling_chunker_task).set_display_name("insert_chunks").set_caching_options(False)
         
-
     # Set the kubernetes secret to be used in the get_chunks_from_documents task
     kubernetes.use_secret_as_env(
         task=s3_sync_task,
@@ -111,26 +130,26 @@ def pipeline(
     kubernetes.mount_pvc(
         s3_sync_task,
         pvc_name=datasets_pvc_name,
-        mount_path=root_mount_path
+        mount_path="/opt/app-root/src"
     )
 
     # Mount the PVC to docling_converter_task
     kubernetes.mount_pvc(
         docling_converter_task,
         pvc_name=datasets_pvc_name,
-        mount_path=root_mount_path
+        mount_path="/opt/app-root/src"
     )
     # Mount the PVC to docling_chunker_task
     kubernetes.mount_pvc(
         docling_chunker_task,
         pvc_name=datasets_pvc_name,
-        mount_path=root_mount_path
+        mount_path="/opt/app-root/src"
     )
     # Mount the PVC to add_chunks_to_vector_store_task
     kubernetes.mount_pvc(
         add_chunks_to_vector_store_task,
         pvc_name=datasets_pvc_name,
-        mount_path=root_mount_path
+        mount_path="/opt/app-root/src"
     )
     
 if __name__ == '__main__':

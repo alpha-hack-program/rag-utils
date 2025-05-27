@@ -1,8 +1,9 @@
 # PIPELINE DEFINITION
 # Name: docling-converter
 # Inputs:
-#    input_dir: str
-#    output_dir: str
+#    input_dir_name: str
+#    output_dir_name: str
+#    root_mount_path: str
 # Outputs:
 #    Output: str
 components:
@@ -10,11 +11,16 @@ components:
     executorLabel: exec-docling-converter
     inputDefinitions:
       parameters:
-        input_dir:
-          description: Directory containing the input documents.
+        input_dir_name:
+          description: The name of the input directory containing documents to convert.
           parameterType: STRING
-        output_dir:
-          description: Directory to save the converted documents.
+        output_dir_name:
+          description: The name of the output directory where converted documents
+            will be saved.
+          parameterType: STRING
+        root_mount_path:
+          description: The root mount path where the input and output directories
+            are located.
           parameterType: STRING
     outputDefinitions:
       parameters:
@@ -39,7 +45,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/docling_converter:v1.0.4
+        image: quay.io/atarazana/docling_converter:v1.0.6
 pipelineInfo:
   name: docling-converter
 root:
@@ -58,19 +64,26 @@ root:
           name: comp-docling-converter
         inputs:
           parameters:
-            input_dir:
-              componentInputParameter: input_dir
-            output_dir:
-              componentInputParameter: output_dir
+            input_dir_name:
+              componentInputParameter: input_dir_name
+            output_dir_name:
+              componentInputParameter: output_dir_name
+            root_mount_path:
+              componentInputParameter: root_mount_path
         taskInfo:
           name: docling-converter
   inputDefinitions:
     parameters:
-      input_dir:
-        description: Directory containing the input documents.
+      input_dir_name:
+        description: The name of the input directory containing documents to convert.
         parameterType: STRING
-      output_dir:
-        description: Directory to save the converted documents.
+      output_dir_name:
+        description: The name of the output directory where converted documents will
+          be saved.
+        parameterType: STRING
+      root_mount_path:
+        description: The root mount path where the input and output directories are
+          located.
         parameterType: STRING
   outputDefinitions:
     parameters:

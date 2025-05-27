@@ -301,19 +301,27 @@ def _docling_chunker(
     packages_to_install=[f"docling[vlm]=={DOCLING_PIP_VERSION}", f"load_dotenv=={LOAD_DOTENV_PIP_VERSION}"]
 )
 def docling_chunker(
-    input_dir: str,
-    output_dir: str
+    root_mount_path: str,
+    input_dir_name: str,
+    output_dir_name: str
 ) -> str:
     """
     Convert documents using Docling.
     Args:
-        input_dir (str): Directory containing the documents to convert.
-        output_dir (str): Directory to save the converted documents.
+        root_mount_path (str): The root mount path where the input and output directories are located.
+        input_dir_name (str): The name of the input directory containing documents to chunk.
+        output_dir_name (str): The name of the output directory where chunked documents will be saved.
     Returns:
         list[str]: Lists of successfully converted
     """
+    # Convert input_dir_name and output_dir_name to Path objects
+    input_dir = Path(root_mount_path) / input_dir_name
+    output_dir = Path(root_mount_path) / output_dir_name
+    # Log the input and output directories
+    _log.info(f"Input directory: {input_dir}")
+    _log.info(f"Output directory: {output_dir}")
+
     # Convert input_dir to a Path object and fail if it can't be converted
-    input_dir = Path(input_dir)
     if not isinstance(input_dir, Path):
         raise ValueError(f"Input directory {input_dir} is not a valid path.")
 
@@ -322,7 +330,6 @@ def docling_chunker(
         raise FileNotFoundError(f"Input directory {input_dir} does not exist.")
 
     # Convert output_dir to a Path object and fail if it can't be converted
-    output_dir = Path(output_dir)
     if not isinstance(output_dir, Path):
         raise ValueError(f"Output directory {output_dir} is not a valid path.")
 

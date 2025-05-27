@@ -1,16 +1,22 @@
 # PIPELINE DEFINITION
 # Name: add-chunks-to-milvus
 # Inputs:
-#    input_dir: str
+#    input_dir_name: str
 #    milvus_collection_name: str
+#    root_mount_path: str
 components:
   comp-add-chunks-to-milvus:
     executorLabel: exec-add-chunks-to-milvus
     inputDefinitions:
       parameters:
-        input_dir:
+        input_dir_name:
+          description: Name of the input directory containing chunk directories.
           parameterType: STRING
         milvus_collection_name:
+          description: Name of the Milvus collection to add chunks to.
+          parameterType: STRING
+        root_mount_path:
+          description: Root mount path where the input directory is located.
           parameterType: STRING
 deploymentSpec:
   executors:
@@ -44,17 +50,24 @@ root:
           name: comp-add-chunks-to-milvus
         inputs:
           parameters:
-            input_dir:
-              componentInputParameter: input_dir
+            input_dir_name:
+              componentInputParameter: input_dir_name
             milvus_collection_name:
               componentInputParameter: milvus_collection_name
+            root_mount_path:
+              componentInputParameter: root_mount_path
         taskInfo:
           name: add-chunks-to-milvus
   inputDefinitions:
     parameters:
-      input_dir:
+      input_dir_name:
+        description: Name of the input directory containing chunk directories.
         parameterType: STRING
       milvus_collection_name:
+        description: Name of the Milvus collection to add chunks to.
+        parameterType: STRING
+      root_mount_path:
+        description: Root mount path where the input directory is located.
         parameterType: STRING
 schemaVersion: 2.1.0
 sdkVersion: kfp-2.10.1

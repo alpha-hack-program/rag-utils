@@ -665,15 +665,43 @@ def _add_chunks_to_milvus(
     ]
 )
 def add_chunks_to_milvus(
-    input_dir: str,
+    root_mount_path: str,
+    input_dir_name: str,
     milvus_collection_name: str,
 ):
+    """
+    Add chunks to Milvus collection.
+    Args:
+        root_mount_path (str): Root mount path where the input directory is located.
+        input_dir_name (str): Name of the input directory containing chunk directories.
+        milvus_collection_name (str): Name of the Milvus collection to add chunks to.
+    Returns:
+        str: JSON string containing lists of successfully added and failed chunk directories.
+    """
+    # Validate input parameters
+    if not root_mount_path:
+        raise ValueError("Root mount path is not set.")
+    if not input_dir_name:
+        raise ValueError("Input directory name is not set.")
+    if not milvus_collection_name:
+        raise ValueError("Milvus collection name is not set.")
+    
+    # Construct the input directory path
+    input_dir = Path(root_mount_path) / input_dir_name
+    
+    # Check if the input directory exists
+    if not input_dir.exists():
+        raise ValueError(f"Input directory {input_dir} does not exist.")
+    
+    # Check if the input directory is a directory
+    if not input_dir.is_dir():
+        raise ValueError(f"Input path {input_dir} is not a directory.")
+
     # Log input directory
     _log.info(f"Input directory: {input_dir}")
 
     # Log milvus collection name
     _log.info(f"Collection Name: {milvus_collection_name}")
-    
     
     # Add chunks to milvus
     success, failure = _add_chunks_to_milvus(

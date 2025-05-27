@@ -14,8 +14,37 @@ echo "Compiling pipeline ${PIPELINE}"
 # Compoments are one level up
 COMPONENTS_DIR=$(dirname "$(pwd)")/components
 
-# Export variables needed while compiling the pipeline
-export PYTHONPATH=${COMPONENTS_DIR}
+# If COMPONENTS_DIR does not exist, print error and exit
+if [ ! -d "${COMPONENTS_DIR}" ]; then
+  echo "Error: COMPONENTS_DIR ${COMPONENTS_DIR} does not exist."
+  exit 1
+fi
+
+# Export BASE_IMAGE, REGISTRY, TAG from the .env file in COMPONENTS_DIR
+if [ ! -f "${COMPONENTS_DIR}/.env" ]; then
+  echo "Error: .env file not found in ${COMPONENTS_DIR}. Please create it with BASE_IMAGE, REGISTRY, and TAG variables."
+  exit 1
+fi
+# Load the base environment variables
+. ${COMPONENTS_DIR}/.env
+
+# Export the variables so Python can see them
+export BASE_IMAGE
+export REGISTRY  
+export TAG
+
+# Add ${COMPONENTS_DIR} to PYTHONPATH
+export PYTHONPATH="${PYTHONPATH}:${COMPONENTS_DIR}"
+
+# Add all ${COMPONENTS_DIR}/${COMPONENT}/src/ to PYTHONPATH
+for COMPONENT in $(ls ${COMPONENTS_DIR}); do
+  if [ -d "${COMPONENTS_DIR}/${COMPONENT}/src" ]; then
+    export PYTHONPATH="${PYTHONPATH}:${COMPONENTS_DIR}/${COMPONENT}/src"
+  fi
+done
+
+# Echo the PYTHONPATH
+echo "PYTHONPATH: ${PYTHONPATH}"
 
 TOKEN=$(oc whoami -t)
 
@@ -24,7 +53,7 @@ if [ -z "$TOKEN" ]; then
   echo "Error: No token found. Please login to OpenShift using 'oc login' command."
   echo "Compile only mode."
 
-  python ${PIPELINE}.py
+  python ${PIPELINE}
 
   exit 1
 fi
@@ -39,15 +68,15 @@ fi
 
 DSPA_HOST=$(oc get route ds-pipeline-dspa -n ${DATA_SCIENCE_PROJECT_NAMESPACE} -o jsonpath='{.spec.host}')
 
-echo "DSPA_HOST: $DSPA_HOST"
+echo "DSPA_HOST: ${DSPA_HOST}"
 
 # If DSPA_HOST is empty print error and exit
-if [ -z "$DSPA_HOST" ]; then
+if [ -z "${DSPA_HOST}" ]; then
   echo "Error: No host found for ds-pipeline-dspa. Please check if the deployment is successful."
   exit 1
 fi
 
-python pipeline.py $TOKEN "https://$DSPA_HOST"
+python ${PIPELINE} ${TOKEN} "https://${DSPA_HOST}"
 
 
 
