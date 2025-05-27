@@ -102,7 +102,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/add_chunks_to_milvus:v1.0.6
+        image: quay.io/atarazana/add_chunks_to_milvus:v1.0.7
     exec-docling-chunker:
       container:
         args:
@@ -316,8 +316,8 @@ platforms:
               secretKey: MILVUS_HOST
             - envVar: MILVUS_PORT
               secretKey: MILVUS_PORT
-            - envVar: MILVUS_USER
-              secretKey: MILVUS_USER
+            - envVar: MILVUS_USERNAME
+              secretKey: MILVUS_USERNAME
             - envVar: MILVUS_PASSWORD
               secretKey: MILVUS_PASSWORD
             secretName: milvus-connection-documents
