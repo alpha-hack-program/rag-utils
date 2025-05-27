@@ -316,8 +316,8 @@ platforms:
               secretKey: MILVUS_HOST
             - envVar: MILVUS_PORT
               secretKey: MILVUS_PORT
-            - envVar: MILVUS_USERNAME
-              secretKey: MILVUS_USERNAME
+            - envVar: MILVUS_USER
+              secretKey: MILVUS_USER
             - envVar: MILVUS_PASSWORD
               secretKey: MILVUS_PASSWORD
             secretName: milvus-connection-documents

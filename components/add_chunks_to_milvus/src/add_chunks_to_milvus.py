@@ -49,7 +49,7 @@ MAX_INPUT_DOCS = int(os.environ.get("MAX_INPUT_DOCS", 2))
 milvus_database = os.environ.get('MILVUS_DATABASE')
 milvus_host = os.environ.get('MILVUS_HOST')
 milvus_port = os.environ.get('MILVUS_PORT')
-milvus_user = os.environ.get('MILVUS_USER')
+milvus_username = os.environ.get('MILVUS_USERNAME')
 milvus_password = os.environ.get('MILVUS_PASSWORD')
 
 # Get the OpenAI connection details
@@ -72,7 +72,7 @@ def query_milvus(
         alias="default",
         host=milvus_host,
         port=milvus_port,
-        user=milvus_user,
+        user=milvus_username,
         password=milvus_password,
         db_name=milvus_database,
     )
@@ -163,7 +163,7 @@ def check_milvus_connection():
             db_name=milvus_database,
             host=milvus_host,
             port=milvus_port,
-            user=milvus_user,
+            user=milvus_username,
             password=milvus_password,
         )
         _log.info("Connected to Milvus successfully.")
@@ -399,7 +399,7 @@ def init(
             alias="default",
             host=milvus_host,
             port=milvus_port,
-            user=milvus_user,
+            user=milvus_username,
             password=milvus_password,
             db_name=milvus_database,
         )
@@ -544,7 +544,7 @@ def _add_chunks_to_milvus(
         Tuple[list[str], list[str]]: Lists of successfully added, and failed.
     """
     # Fail if any of the required environment variables are not set
-    if not all([milvus_database, milvus_host, milvus_port, milvus_user, milvus_password]):
+    if not all([milvus_database, milvus_host, milvus_port, milvus_username, milvus_password]):
         raise ValueError("Missing required environment variables for Milvus connection.")
     if not all([openai_api_key, openai_api_model, openai_api_embeddings_url]):
         raise ValueError("Missing required environment variables for OpenAI connection to generate embeddings.")
@@ -560,7 +560,7 @@ def _add_chunks_to_milvus(
     # Log Milvus connection details
     _log.info(f"Milvus host: {milvus_host}")
     _log.info(f"Milvus port: {milvus_port}")
-    _log.info(f"Milvus user: {milvus_user}")
+    _log.info(f"Milvus user: {milvus_username}")
     _log.info(f"Milvus password: *********")
     _log.info(f"OpenAI API key: {openai_api_key}")
     _log.info(f"OpenAI API embeddings URL: {openai_api_embeddings_url}")
