@@ -138,7 +138,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/docling_converter:v1.0.6
+        image: quay.io/atarazana/docling_converter:v1.0.7
     exec-s3-sync:
       container:
         args:
