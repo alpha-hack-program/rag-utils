@@ -1,14 +1,9 @@
 # PIPELINE DEFINITION
 # Name: s3-sync
 # Inputs:
-#    aws_access_key_id: str
-#    aws_secret_access_key: str
-#    bucket_name: str
-#    endpoint_url: str
 #    folder: str
 #    force: bool [Default: False]
 #    local_folder: str
-#    region_name: str
 #    root_mount_path: str
 # Outputs:
 #    Output: str
@@ -17,25 +12,19 @@ components:
     executorLabel: exec-s3-sync
     inputDefinitions:
       parameters:
-        aws_access_key_id:
-          parameterType: STRING
-        aws_secret_access_key:
-          parameterType: STRING
-        bucket_name:
-          parameterType: STRING
-        endpoint_url:
-          parameterType: STRING
         folder:
+          description: S3 folder to sync from.
           parameterType: STRING
         force:
           defaultValue: false
+          description: Force download even if the file exists locally.
           isOptional: true
           parameterType: BOOLEAN
         local_folder:
-          parameterType: STRING
-        region_name:
+          description: Local folder to sync to.
           parameterType: STRING
         root_mount_path:
+          description: Local root mount path.
           parameterType: STRING
     outputDefinitions:
       parameters:
@@ -79,47 +68,31 @@ root:
           name: comp-s3-sync
         inputs:
           parameters:
-            aws_access_key_id:
-              componentInputParameter: aws_access_key_id
-            aws_secret_access_key:
-              componentInputParameter: aws_secret_access_key
-            bucket_name:
-              componentInputParameter: bucket_name
-            endpoint_url:
-              componentInputParameter: endpoint_url
             folder:
               componentInputParameter: folder
             force:
               componentInputParameter: force
             local_folder:
               componentInputParameter: local_folder
-            region_name:
-              componentInputParameter: region_name
             root_mount_path:
               componentInputParameter: root_mount_path
         taskInfo:
           name: s3-sync
   inputDefinitions:
     parameters:
-      aws_access_key_id:
-        parameterType: STRING
-      aws_secret_access_key:
-        parameterType: STRING
-      bucket_name:
-        parameterType: STRING
-      endpoint_url:
-        parameterType: STRING
       folder:
+        description: S3 folder to sync from.
         parameterType: STRING
       force:
         defaultValue: false
+        description: Force download even if the file exists locally.
         isOptional: true
         parameterType: BOOLEAN
       local_folder:
-        parameterType: STRING
-      region_name:
+        description: Local folder to sync to.
         parameterType: STRING
       root_mount_path:
+        description: Local root mount path.
         parameterType: STRING
   outputDefinitions:
     parameters:
