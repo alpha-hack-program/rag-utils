@@ -17,7 +17,6 @@ from docling_core.transforms.chunker.hierarchical_chunker import DocChunk
 
 from kfp import compiler
 from kfp import dsl
-from kfp.dsl import Input, Output, Dataset
 
 # Allowed log levels
 VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
@@ -38,8 +37,10 @@ REGISTRY = os.environ.get("REGISTRY", f"image-registry.openshift-image-registry.
 TAG = os.environ.get("TAG", f"latest")
 TARGET_IMAGE = f"{REGISTRY}/{COMPONENT_NAME}:{TAG}"
 
-LANGCHAIN_COMMUNITY_PIP_VERSION = "0.3.20"
-PYPDF_PIP_VERSION = "5.4.0"
+
+PYMILVUS_VERSION = "2.5.8"
+DOCLING_CORE_VERSION = "2.31.0"
+REQUESTS_VERSION = "2.32.3"
 
 # MAX_INPUT_DOCS is the value of MAX_INPUT_DOCS environment variable or 20
 MAX_INPUT_DOCS = int(os.environ.get("MAX_INPUT_DOCS", 2))
@@ -655,8 +656,13 @@ def _add_chunks_to_milvus(
 
 # Add chunks to Milvus
 @dsl.component(
-    base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
-    packages_to_install=["pymilvus", "transformers", "torch", "langchain_core", "einops"]
+    base_image=BASE_IMAGE,
+    target_image=TARGET_IMAGE,
+    packages_to_install=[
+        f"docling-core=={DOCLING_CORE_VERSION}",
+        f"pymilvus=={PYMILVUS_VERSION}",
+        f"requests=={REQUESTS_VERSION}",
+    ]
 )
 def add_chunks_to_milvus(
     input_dir: str,
