@@ -49,7 +49,7 @@ add_chunks_to_milvus_component = load_component_from_file(ADD_CHUNKS_TO_MILVUS_C
 def pipeline(
     root_mount_path: str = "/opt/app-root/src",
     documents_bucket_folder: str = "documents",
-    milvus_collection_name: str = "chunks",
+    milvus_collection_name: str = "document_chunks",
     images_dataset_pvc_name: str = "images-dataset-pvc",
     images_dataset_pvc_size_in_gi: int = 10,
     documents_dir_name: str = "documents",

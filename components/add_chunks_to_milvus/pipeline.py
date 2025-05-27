@@ -15,12 +15,13 @@ print(f"COMPONENT_NAME: {COMPONENT_NAME}")
 def pipeline(
     milvus_collection_name: str = "chunks",
     root_mount_path: str = "/tmp",
-    local_folder: str = "collections",
+    input_dir_name: str = "collections",
     force: bool = False):
 
     # Add chunks to Milvus
     add_chunks_to_milvus_task = add_chunks_to_milvus(
-        input_dir=f"{root_mount_path}/{local_folder}",
+        root_mount_path=root_mount_path,
+        input_dir_name=input_dir_name,
         milvus_collection_name=milvus_collection_name,
     ).set_caching_options(False)
 

@@ -37,7 +37,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/add_chunks_to_milvus:v1.0.5
+        image: quay.io/atarazana/add_chunks_to_milvus:v1.0.6
 pipelineInfo:
   name: add-chunks-to-milvus
 root:

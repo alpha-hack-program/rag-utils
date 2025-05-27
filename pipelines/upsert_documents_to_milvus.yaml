@@ -8,7 +8,7 @@
 #    force: bool [Default: False]
 #    images_dataset_pvc_name: str [Default: 'images-dataset-pvc']
 #    images_dataset_pvc_size_in_gi: int [Default: 10.0]
-#    milvus_collection_name: str [Default: 'chunks']
+#    milvus_collection_name: str [Default: 'document_chunks']
 #    root_mount_path: str [Default: '/opt/app-root/src']
 components:
   comp-add-chunks-to-milvus:
@@ -102,7 +102,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/add_chunks_to_milvus:v1.0.5
+        image: quay.io/atarazana/add_chunks_to_milvus:v1.0.6
     exec-docling-chunker:
       container:
         args:
@@ -290,7 +290,7 @@ root:
         isOptional: true
         parameterType: NUMBER_INTEGER
       milvus_collection_name:
-        defaultValue: chunks
+        defaultValue: document_chunks
         isOptional: true
         parameterType: STRING
       root_mount_path:
