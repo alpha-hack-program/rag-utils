@@ -1,0 +1,60 @@
+# PIPELINE DEFINITION
+# Name: add-chunks-to-milvus
+# Inputs:
+#    input_dir: str
+#    milvus_collection_name: str
+components:
+  comp-add-chunks-to-milvus:
+    executorLabel: exec-add-chunks-to-milvus
+    inputDefinitions:
+      parameters:
+        input_dir:
+          parameterType: STRING
+        milvus_collection_name:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-add-chunks-to-milvus:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - add_chunks_to_milvus
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'docling-core==2.31.0'\
+          \ 'pymilvus==2.5.8' 'requests==2.32.3' && \"$0\" \"$@\"\n"
+        - python3
+        - -m
+        - kfp.dsl.executor_main
+        image: quay.io/atarazana/add_chunks_to_milvus:v1.0.5
+pipelineInfo:
+  name: add-chunks-to-milvus
+root:
+  dag:
+    tasks:
+      add-chunks-to-milvus:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-add-chunks-to-milvus
+        inputs:
+          parameters:
+            input_dir:
+              componentInputParameter: input_dir
+            milvus_collection_name:
+              componentInputParameter: milvus_collection_name
+        taskInfo:
+          name: add-chunks-to-milvus
+  inputDefinitions:
+    parameters:
+      input_dir:
+        parameterType: STRING
+      milvus_collection_name:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.10.1
