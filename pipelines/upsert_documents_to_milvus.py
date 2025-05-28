@@ -96,7 +96,7 @@ def pipeline(
     ).after(docling_converter_task).set_display_name("docling_chunker").set_caching_options(False)
 
     # Add chunks to vector store
-    add_chunks_to_vector_store_task = add_chunks_to_milvus_component(
+    add_chunks_to_milvus_task = add_chunks_to_milvus_component(
         root_mount_path=root_mount_path,
         input_dir_name=chunks_dir_name, # chunks_dir_name
         milvus_collection_name=milvus_collection_name,
@@ -116,7 +116,7 @@ def pipeline(
 
     # Set the kubernetes secret to be used in the add_chunks_to_milvus task
     kubernetes.use_secret_as_env(
-        task=add_chunks_to_vector_store_task,
+        task=add_chunks_to_milvus_task,
         secret_name='milvus-connection-documents',
         secret_key_to_env={
             'MILVUS_DATABASE': 'MILVUS_DATABASE',
@@ -124,6 +124,14 @@ def pipeline(
             'MILVUS_PORT': 'MILVUS_PORT',
             'MILVUS_USERNAME': 'MILVUS_USERNAME',
             'MILVUS_PASSWORD': 'MILVUS_PASSWORD',
+        })
+    kubernetes.use_secret_as_env(
+        task=add_chunks_to_milvus_task,
+        secret_name='openai-connection-embeddings',
+        secret_key_to_env={
+            'OPENAI_API_KEY': 'OPENAI_API_KEY',
+            'OPENAI_API_MODEL': 'OPENAI_API_MODEL',
+            'OPENAI_API_BASE': 'OPENAI_API_BASE',
         })
     
     # Mount the PVC to task s3_sync_task
@@ -147,7 +155,7 @@ def pipeline(
     )
     # Mount the PVC to add_chunks_to_vector_store_task
     kubernetes.mount_pvc(
-        add_chunks_to_vector_store_task,
+        add_chunks_to_milvus_task,
         pvc_name=datasets_pvc_name,
         mount_path="/opt/app-root/src"
     )

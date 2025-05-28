@@ -127,9 +127,11 @@ def check_openai_embeddings_connection():
     """
     try:
         headers = {
-            "Authorization": f"Bearer {openai_api_key}",
             "Content-Type": "application/json",
         }
+        # Add authorization header if the API key is set
+        if openai_api_key:
+            headers["Authorization"] = f"Bearer {openai_api_key}"
         data = {
             "model": "{openai_api_model}",
             "input": "Hello, world!",
@@ -199,9 +201,11 @@ def get_embedding(
         requests.exceptions.RequestException: If the connection to OpenAI API fails.
     """
     headers = {
-        "Authorization": f"Bearer {openai_api_key}",
         "Content-Type": "application/json",
     }
+    # Add authorization header if the API key is set
+    if openai_api_key:
+        headers["Authorization"] = f"Bearer {openai_api_key}"
     data = {
         "model": openai_api_model,
         "input": content,
@@ -543,10 +547,25 @@ def _add_chunks_to_milvus(
     Returns:
         Tuple[list[str], list[str]]: Lists of successfully added, and failed.
     """
+    # Log input directory
+    _log.info(f"Input directory: {input_dir}")
+
+    # Log milvus connection 
+    _log.info(f"Connecting to Milvus collection: {milvus_collection_name}")
+    _log.info(f"Using Milvus database: {milvus_database}")
+    _log.info(f"Using Milvus username: {milvus_username}")
+
     # Fail if any of the required environment variables are not set
     if not all([milvus_database, milvus_host, milvus_port, milvus_username, milvus_password]):
         raise ValueError("Missing required environment variables for Milvus connection.")
-    if not all([openai_api_key, openai_api_model, openai_api_embeddings_url]):
+    
+    # Log OpenAI connection details
+    _log.info(f"Connecting to OpenAI API with model: {openai_api_model}")
+    _log.info(f"Using OpenAI API key: {openai_api_key}")
+    _log.info(f"Using OpenAI API embeddings URL: {openai_api_embeddings_url}")
+
+    # Fail if openai_api_model or openai_api_embeddings_url are not set
+    if not all([ openai_api_model, openai_api_embeddings_url]):
         raise ValueError("Missing required environment variables for OpenAI connection to generate embeddings.")
     
     # Fail if the input directory is not set or does not exist
@@ -554,16 +573,6 @@ def _add_chunks_to_milvus(
         raise ValueError("Input directory is not set.")
     if not input_dir.exists():
         raise ValueError(f"Input directory {input_dir} does not exist.")
-
-    # Log input directory
-    _log.info(f"Input directory: {input_dir}")
-    # Log Milvus connection details
-    _log.info(f"Milvus host: {milvus_host}")
-    _log.info(f"Milvus port: {milvus_port}")
-    _log.info(f"Milvus user: {milvus_username}")
-    _log.info(f"Milvus password: *********")
-    _log.info(f"OpenAI API key: {openai_api_key}")
-    _log.info(f"OpenAI API embeddings URL: {openai_api_embeddings_url}")
     
     # Check the connection to Milvus
     check_milvus_connection()

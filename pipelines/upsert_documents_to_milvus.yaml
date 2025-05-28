@@ -321,6 +321,14 @@ platforms:
             - envVar: MILVUS_PASSWORD
               secretKey: MILVUS_PASSWORD
             secretName: milvus-connection-documents
+          - keyToEnv:
+            - envVar: OPENAI_API_KEY
+              secretKey: OPENAI_API_KEY
+            - envVar: OPENAI_API_MODEL
+              secretKey: OPENAI_API_MODEL
+            - envVar: OPENAI_API_BASE
+              secretKey: OPENAI_API_BASE
+            secretName: openai-connection-embeddings
         exec-docling-chunker:
           pvcMount:
           - componentInputParameter: images_dataset_pvc_name
