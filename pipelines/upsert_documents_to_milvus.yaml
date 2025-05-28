@@ -102,7 +102,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/add_chunks_to_milvus:v1.0.7
+        image: quay.io/atarazana/add_chunks_to_milvus:v1.0.8
     exec-docling-chunker:
       container:
         args:
