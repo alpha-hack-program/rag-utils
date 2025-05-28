@@ -4,6 +4,8 @@
 #    input_dir_name: str
 #    milvus_collection_name: str
 #    root_mount_path: str
+# Outputs:
+#    Output: str
 components:
   comp-add-chunks-to-milvus:
     executorLabel: exec-add-chunks-to-milvus
@@ -17,6 +19,10 @@ components:
           parameterType: STRING
         root_mount_path:
           description: Root mount path where the input directory is located.
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
           parameterType: STRING
 deploymentSpec:
   executors:
@@ -37,11 +43,17 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/add_chunks_to_milvus:v1.0.8
+        image: quay.io/atarazana/add_chunks_to_milvus:v1.0.14
 pipelineInfo:
   name: add-chunks-to-milvus
 root:
   dag:
+    outputs:
+      parameters:
+        Output:
+          valueFromParameter:
+            outputParameterKey: Output
+            producerSubtask: add-chunks-to-milvus
     tasks:
       add-chunks-to-milvus:
         cachingOptions:
@@ -68,6 +80,10 @@ root:
         parameterType: STRING
       root_mount_path:
         description: Root mount path where the input directory is located.
+        parameterType: STRING
+  outputDefinitions:
+    parameters:
+      Output:
         parameterType: STRING
 schemaVersion: 2.1.0
 sdkVersion: kfp-2.10.1

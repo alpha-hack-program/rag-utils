@@ -132,14 +132,10 @@ def check_openai_embeddings_connection():
         # Add authorization header if the API key is set
         if openai_api_key:
             headers["Authorization"] = f"Bearer {openai_api_key}"
-        data = {
-            "model": "{openai_api_model}",
-            "input": "Hello, world!",
-        }
-        response = requests.post(
-            f"{openai_api_embeddings_url}/v1/embeddings",
+
+        response = requests.get(
+            f"{openai_api_embeddings_url}/v1/models",
             headers=headers,
-            json=data,
         )
         response.raise_for_status()
         _log.info("Connected to OpenAI successfully.")
@@ -485,14 +481,25 @@ def _create_collection(
     
     return collection
 
+# def wait_for_index(collection, index_name: str, sleep_seconds: int = 1):
+#     while True:
+#         try:
+#             collection.describe_index(index_name=index_name)
+#             return
+#         except Exception as e:
+#             _log.info(f"Waiting for index '{index_name}': {e}")
+#             time.sleep(sleep_seconds)
+
 def wait_for_index(collection, index_name: str, sleep_seconds: int = 1):
     while True:
         try:
-            collection.describe_index(index_name=index_name)
-            return
+            index_ready = any(index.index_name == index_name for index in collection.indexes)
+            if index_ready:
+                return
         except Exception as e:
-            _log.info(f"Waiting for index '{index_name}': {e}")
-            time.sleep(sleep_seconds)
+            _log.info(f"Error checking index '{index_name}': {e}")
+        _log.info(f"Waiting for index '{index_name}' to be ready...")
+        time.sleep(sleep_seconds)
 
 def _create_indexes(collection):
     """
@@ -538,14 +545,14 @@ def _create_indexes(collection):
 def _add_chunks_to_milvus(
     input_dir: Path,
     milvus_collection_name: str,
-) -> tuple[list[str], list[str]]:
+) -> tuple[list[Path], list[Path]]:
     """
     Convert documents using Docling.
     Args:
         input_dir (Path): Path to the input directory.
         milvus_collection_name (str): Name of the Milvus collection.
     Returns:
-        Tuple[list[str], list[str]]: Lists of successfully added, and failed.
+        Tuple[list[Path], list[Path]]: Lists of successfully added, and failed.
     """
     # Log input directory
     _log.info(f"Input directory: {input_dir}")
@@ -583,7 +590,9 @@ def _add_chunks_to_milvus(
     # Set embedding dimension based on the model
     if openai_api_model == "/mnt/models": # NOMIC in MaaS
         embedding_dim = 768
-    elif openai_api_model == "text-embedding-babbage-001":
+    elif openai_api_model == "multilingual-e5-large":
+        embedding_dim = 1024
+    elif openai_api_model == "multilingual-e5-large-gpu":
         embedding_dim = 1024
     elif openai_api_model == "text-embedding-curie-001":
         embedding_dim = 768
@@ -677,7 +686,7 @@ def add_chunks_to_milvus(
     root_mount_path: str,
     input_dir_name: str,
     milvus_collection_name: str,
-):
+) -> str:
     """
     Add chunks to Milvus collection.
     Args:
@@ -718,10 +727,17 @@ def add_chunks_to_milvus(
         milvus_collection_name=milvus_collection_name,
     )
 
-    # return the lists as a json string
+    # Log the number of successfully added and failed chunk directories
+    _log.info(
+        f"Successfully added {len(success)} chunk directories, "
+        f"failed to add {len(failure)} chunk directories."
+    )
+
+    # return the lists as a json string, converting Path objects to strings
+    _log.info("Returning success and failure lists as JSON.")
     return json.dumps({
         "success": [str(path) for path in success],
-        "failure": [str(path) for path in failure]
+        "failure": [str(path) for path in failure],
     })
 
 

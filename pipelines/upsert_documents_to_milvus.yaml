@@ -21,6 +21,10 @@ components:
           parameterType: STRING
         root_mount_path:
           parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
   comp-docling-chunker:
     executorLabel: exec-docling-chunker
     inputDefinitions:
@@ -102,7 +106,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/add_chunks_to_milvus:v1.0.8
+        image: quay.io/atarazana/add_chunks_to_milvus:v1.0.14
     exec-docling-chunker:
       container:
         args:
