@@ -96,7 +96,7 @@ def pipeline(
     ).after(docling_converter_task).set_display_name("docling_chunker").set_caching_options(False)
     # Set the kubernetes environment variable to set the chunking model and size
     docling_chunker_task.set_env_variable(name="TOKENIZER_EMBED_MODEL_ID", value="intfloat/multilingual-e5-large")
-    docling_chunker_task.set_env_variable(name="TOKENIZER_MAX_TOKENS", value="512")
+    docling_chunker_task.set_env_variable(name="TOKENIZER_MAX_TOKENS", value="476") # 464 = 512 - 48 (for the prompt)
 
     # Add chunks to vector store
     add_chunks_to_milvus_task = add_chunks_to_milvus_component(
