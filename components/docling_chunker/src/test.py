@@ -49,6 +49,16 @@ def main():
     print(f"Input directory: {args.inputdir}")
     print(f"Output directory: {args.outputdir}")
 
+    # Get TOKENIZER_EMBED_MODEL_ID from environment variable or use default
+    tokenizer_embed_model_id = os.getenv("TOKENIZER_EMBED_MODEL_ID", "intfloat/multilingual-e5-large")
+    print(f"Tokenizer embed model ID: {tokenizer_embed_model_id}")
+    # Get TOKENIZER_MAX_TOKENS from environment variable or use default
+    tokenizer_max_tokens = int(os.getenv("TOKENIZER_MAX_TOKENS", 476))  # Default to 476 if not set
+    print(f"Tokenizer max tokens: {tokenizer_max_tokens}")
+    # Get MERGE_PEERS from environment variable or use default
+    merge_peers = os.getenv("MERGE_PEERS", "True").lower() in ("true", "1", "yes")
+    print(f"Merge peers: {merge_peers}")
+
     # Start the timer
     start_time = time.time()
 
@@ -56,6 +66,9 @@ def main():
     success, failure = _docling_chunker(
         input_dir=Path(args.inputdir),
         output_dir=Path(args.outputdir),
+        tokenizer_embed_model_id=tokenizer_embed_model_id,
+        tokenizer_max_tokens=tokenizer_max_tokens,
+        merge_peers=merge_peers
     )
 
     # Log the conversion results

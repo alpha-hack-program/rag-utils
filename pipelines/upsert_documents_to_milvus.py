@@ -55,6 +55,9 @@ def pipeline(
     documents_dir_name: str = "documents",
     converted_dir_name: str = "converted",
     chunks_dir_name: str = "chunks",
+    tokenizer_embed_model_id: str = "intfloat/multilingual-e5-large",
+    tokenizer_max_tokens: int = 476, # 464 = 512 - 48 (for the prompt)
+    merge_peers: bool = True,
     force: bool = False, # Force download even if the file exists locally
 ):
     
@@ -82,17 +85,15 @@ def pipeline(
         input_dir_name=documents_dir_name, # documents_input_dir
         output_dir_name=converted_dir_name, # converted_output_dir
     ).after(s3_sync_task).set_display_name("docling_converter").set_caching_options(False)
-    # # Convert documents using docling
-    # docling_converter_task = docling_converter_component(
-    #     input_dir=f"{root_mount_path}/{documents_dir_name}", # documents_input_dir
-    #     output_dir=f"{root_mount_path}/{converted_dir_name}", # converted_output_dir
-    # ).after(s3_sync_task).set_display_name("docling_converter").set_caching_options(False)
 
     # Chunk documents using docling
     docling_chunker_task = docling_chunker_component(
         root_mount_path=root_mount_path,
         input_dir_name=converted_dir_name, # converted_dir_name
         output_dir_name=chunks_dir_name, # chunks_output_dir
+        tokenizer_embed_model_id=tokenizer_embed_model_id,
+        tokenizer_max_tokens=tokenizer_max_tokens, # 476 = 512 - 48 (for the prompt)
+        merge_peers=merge_peers, # Merge peers into one chunk
     ).after(docling_converter_task).set_display_name("docling_chunker").set_caching_options(False)
     # Set the kubernetes environment variable to set the chunking model and size
     docling_chunker_task.set_env_variable(name="TOKENIZER_EMBED_MODEL_ID", value="intfloat/multilingual-e5-large")

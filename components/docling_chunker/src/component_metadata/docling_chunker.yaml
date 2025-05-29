@@ -2,8 +2,11 @@
 # Name: docling-chunker
 # Inputs:
 #    input_dir_name: str
+#    merge_peers: bool [Default: True]
 #    output_dir_name: str
 #    root_mount_path: str
+#    tokenizer_embed_model_id: str
+#    tokenizer_max_tokens: int
 # Outputs:
 #    Output: str
 components:
@@ -14,6 +17,10 @@ components:
         input_dir_name:
           description: The name of the input directory containing documents to chunk.
           parameterType: STRING
+        merge_peers:
+          defaultValue: true
+          isOptional: true
+          parameterType: BOOLEAN
         output_dir_name:
           description: The name of the output directory where chunked documents will
             be saved.
@@ -22,6 +29,12 @@ components:
           description: The root mount path where the input and output directories
             are located.
           parameterType: STRING
+        tokenizer_embed_model_id:
+          isOptional: true
+          parameterType: STRING
+        tokenizer_max_tokens:
+          isOptional: true
+          parameterType: NUMBER_INTEGER
     outputDefinitions:
       parameters:
         Output:
@@ -45,7 +58,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/docling_chunker:v1.0.4
+        image: quay.io/atarazana/docling_chunker:v1.0.6
 pipelineInfo:
   name: docling-chunker
 root:
@@ -66,10 +79,16 @@ root:
           parameters:
             input_dir_name:
               componentInputParameter: input_dir_name
+            merge_peers:
+              componentInputParameter: merge_peers
             output_dir_name:
               componentInputParameter: output_dir_name
             root_mount_path:
               componentInputParameter: root_mount_path
+            tokenizer_embed_model_id:
+              componentInputParameter: tokenizer_embed_model_id
+            tokenizer_max_tokens:
+              componentInputParameter: tokenizer_max_tokens
         taskInfo:
           name: docling-chunker
   inputDefinitions:
@@ -77,6 +96,10 @@ root:
       input_dir_name:
         description: The name of the input directory containing documents to chunk.
         parameterType: STRING
+      merge_peers:
+        defaultValue: true
+        isOptional: true
+        parameterType: BOOLEAN
       output_dir_name:
         description: The name of the output directory where chunked documents will
           be saved.
@@ -85,6 +108,12 @@ root:
         description: The root mount path where the input and output directories are
           located.
         parameterType: STRING
+      tokenizer_embed_model_id:
+        isOptional: true
+        parameterType: STRING
+      tokenizer_max_tokens:
+        isOptional: true
+        parameterType: NUMBER_INTEGER
   outputDefinitions:
     parameters:
       Output:

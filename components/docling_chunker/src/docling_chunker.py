@@ -219,7 +219,10 @@ def chunk_batch(
 
 def _docling_chunker(
     input_dir: Path,
-    output_dir: Path
+    output_dir: Path,
+    tokenizer_embed_model_id: str = None,
+    tokenizer_max_tokens: int = None,
+    merge_peers: bool = True,
 ) -> tuple[list[str], list[str]]:
     """
     Chunk documents using the Docling chunker.
@@ -237,8 +240,9 @@ def _docling_chunker(
     _log.info(f"Output directory: {output_dir}")
 
     # Log chunker settingsx
-    _log.info(f"Using tokenizer embed model ID: {TOKENIZER_EMBED_MODEL_ID}")
-    _log.info(f"Using tokenizer max tokens: {TOKENIZER_MAX_TOKENS}")
+    _log.info(f"Using tokenizer embed model ID: {tokenizer_embed_model_id}")
+    _log.info(f"Using tokenizer max tokens: {tokenizer_max_tokens}")
+    _log.info(f"Using merge peers: {merge_peers}")
 
     # Check if the input directory exists
     if not input_dir.exists():
@@ -302,8 +306,9 @@ def _docling_chunker(
 
     # Chunker
     chunker = create_hybrid_chunker(
-        tokenizer_embed_model_id=TOKENIZER_EMBED_MODEL_ID,
-        tokenizer_max_tokens=TOKENIZER_MAX_TOKENS,
+        tokenizer_embed_model_id=tokenizer_embed_model_id,
+        tokenizer_max_tokens=tokenizer_max_tokens,
+        merge_peers=merge_peers,
     )
 
     # Convert the documents in batches, use tqdm to show progress
@@ -350,7 +355,10 @@ def _docling_chunker(
 def docling_chunker(
     root_mount_path: str,
     input_dir_name: str,
-    output_dir_name: str
+    output_dir_name: str,
+    tokenizer_embed_model_id: str = None,
+    tokenizer_max_tokens: int = None,
+    merge_peers: bool = True,
 ) -> str:
     """
     Convert documents using Docling.
@@ -389,6 +397,9 @@ def docling_chunker(
     success, failure = _docling_chunker(
         input_dir=input_dir,
         output_dir=output_dir,
+        tokenizer_embed_model_id=tokenizer_embed_model_id,
+        tokenizer_max_tokens=tokenizer_max_tokens,
+        merge_peers=merge_peers,
     )
     
     # return the lists as a json string

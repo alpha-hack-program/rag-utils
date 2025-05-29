@@ -8,8 +8,11 @@
 #    documents_pvc_name: str [Default: 'documents-pvc']
 #    documents_pvc_size_in_gi: int [Default: 10.0]
 #    force: bool [Default: False]
+#    merge_peers: bool [Default: True]
 #    milvus_collection_name: str [Default: 'document_chunks']
 #    root_mount_path: str [Default: '/opt/app-root/src']
+#    tokenizer_embed_model_id: str [Default: 'intfloat/multilingual-e5-large']
+#    tokenizer_max_tokens: int [Default: 476.0]
 components:
   comp-add-chunks-to-milvus:
     executorLabel: exec-add-chunks-to-milvus
@@ -31,10 +34,20 @@ components:
       parameters:
         input_dir_name:
           parameterType: STRING
+        merge_peers:
+          defaultValue: true
+          isOptional: true
+          parameterType: BOOLEAN
         output_dir_name:
           parameterType: STRING
         root_mount_path:
           parameterType: STRING
+        tokenizer_embed_model_id:
+          isOptional: true
+          parameterType: STRING
+        tokenizer_max_tokens:
+          isOptional: true
+          parameterType: NUMBER_INTEGER
     outputDefinitions:
       parameters:
         Output:
@@ -129,7 +142,7 @@ deploymentSpec:
           value: intfloat/multilingual-e5-large
         - name: TOKENIZER_MAX_TOKENS
           value: '476'
-        image: quay.io/atarazana/docling_chunker:v1.0.4
+        image: quay.io/atarazana/docling_chunker:v1.0.6
     exec-docling-converter:
       container:
         args:
@@ -215,10 +228,16 @@ root:
           parameters:
             input_dir_name:
               componentInputParameter: converted_dir_name
+            merge_peers:
+              componentInputParameter: merge_peers
             output_dir_name:
               componentInputParameter: chunks_dir_name
             root_mount_path:
               componentInputParameter: root_mount_path
+            tokenizer_embed_model_id:
+              componentInputParameter: tokenizer_embed_model_id
+            tokenizer_max_tokens:
+              componentInputParameter: tokenizer_max_tokens
         taskInfo:
           name: docling_chunker
       docling-converter:
@@ -298,6 +317,10 @@ root:
         defaultValue: false
         isOptional: true
         parameterType: BOOLEAN
+      merge_peers:
+        defaultValue: true
+        isOptional: true
+        parameterType: BOOLEAN
       milvus_collection_name:
         defaultValue: document_chunks
         isOptional: true
@@ -306,6 +329,14 @@ root:
         defaultValue: /opt/app-root/src
         isOptional: true
         parameterType: STRING
+      tokenizer_embed_model_id:
+        defaultValue: intfloat/multilingual-e5-large
+        isOptional: true
+        parameterType: STRING
+      tokenizer_max_tokens:
+        defaultValue: 476.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
 schemaVersion: 2.1.0
 sdkVersion: kfp-2.10.1
 ---
