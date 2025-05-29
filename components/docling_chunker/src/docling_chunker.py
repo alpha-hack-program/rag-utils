@@ -61,28 +61,42 @@ def create_hybrid_chunker(
     tokenizer_max_tokens: int = None,
     merge_peers: bool = True,
 ) -> HybridChunker:
-    """Create a HybridChunker with the specified parameters."""
-    
+    """
+    Create a HybridChunker with the specified parameters.
+    Args:
+        tokenizer_embed_model_id (str): The ID of the tokenizer to use for embedding.
+        tokenizer_max_tokens (int): The maximum number of tokens to use for the tokenizer.
+        merge_peers (bool): Whether to merge peers.
+    Returns:
+        HybridChunker: A HybridChunker instance.
+    """
+    # Log the tokenizer embed model ID and max tokens
+    _log.info(f"Using tokenizer embed model ID: {tokenizer_embed_model_id}")
+    _log.info(f"Using tokenizer max tokens: {tokenizer_max_tokens}")
+
     # If the tokenizer_embed_model_id is None create a default HybridChunker
     if tokenizer_embed_model_id is None:
         # Create a default tokenizer
         return HybridChunker()
 
     # Create the tokenizer
+    _log.info(f"Loading tokenizer from model ID: {tokenizer_embed_model_id}")
     _tokenizer = AutoTokenizer.from_pretrained(tokenizer_embed_model_id)
-    tokenizer = None
+    
+    # Check if the tokenizer is loaded correctly
+    if _tokenizer is None:
+        _log.error(f"Failed to load tokenizer from model ID: {tokenizer_embed_model_id}")
+        raise ValueError(f"Failed to load tokenizer from model ID: {tokenizer_embed_model_id}")
+    _log.info(f"Tokenizer loaded successfully from model ID: {tokenizer_embed_model_id}")
 
-    # Create a Tokenizer with the specified model ID and max tokens only if max_tokens is not None
-    if tokenizer_max_tokens is not None:
-        tokenizer = HuggingFaceTokenizer(
-            tokenizer=_tokenizer,
-            max_tokens=tokenizer_max_tokens,
-        )
-    else:
-        # Create a default tokenizer    
-        tokenizer = HuggingFaceTokenizer(
-            tokenizer=_tokenizer,
-        )
+    # Log tokenizer max allowed tokens
+    _log.info(f"Tokenizer max allowed tokens: {_tokenizer.model_max_length}")
+
+    # Create a HuggingFaceTokenizer with optional max_tokens
+    tokenizer = HuggingFaceTokenizer(
+        tokenizer=_tokenizer,
+        max_tokens=tokenizer_max_tokens,
+    )
 
     # Create a HierarchicalChunker with the specified chunk size and merge list items
     chunker = HybridChunker(
@@ -91,7 +105,7 @@ def create_hybrid_chunker(
     )
     
     return chunker
-    
+
 def chunk_batch(
     batch: list[Path],
     chunker: HybridChunker,
@@ -150,13 +164,23 @@ def chunk_batch(
             # Save the chunks in the output directory
             number_of_chunks = 0
             for i, chunk in enumerate(chunks):
+                contextualized_text = chunker.contextualize(chunk=chunk)
+                chunk_size = chunker.tokenizer.count_tokens(contextualized_text)
+                # Log the chunk size
+                _log.info(f"Chunk {i} size: {chunk_size} tokens")
+                # Check if the chunk size exceeds the maximum allowed tokens for the tokenizer
+                if chunk_size > TOKENIZER_MAX_TOKENS:
+                    _log.warning(
+                        f"Chunk {i} size {chunk_size} exceeds the maximum allowed tokens {TOKENIZER_MAX_TOKENS}. "
+                        "This may lead to issues with the tokenizer."
+                    )
                 number_of_chunks += 1
                 chunk_file = chunks_dir / f"{doc_name}_chunk_{i}.json"
                 with open(chunk_file, "w") as f:
                     f.write(chunk.model_dump_json())
                 chunk_with_context = chunks_dir / f"{doc_name}_chunk_{i}.ctxt"
                 with open(chunk_with_context, "w") as f:
-                    f.write(chunker.contextualize(chunk=chunk))
+                    f.write(contextualized_text)
 
             # Add the number of chunks to the dictionary
             chunked_documents[doc_file] = number_of_chunks
@@ -192,6 +216,10 @@ def _docling_chunker(
     _log.info(f"Input directory: {input_dir}")
     # Log output directory
     _log.info(f"Output directory: {output_dir}")
+
+    # Log chunker settingsx
+    _log.info(f"Using tokenizer embed model ID: {TOKENIZER_EMBED_MODEL_ID}")
+    _log.info(f"Using tokenizer max tokens: {TOKENIZER_MAX_TOKENS}")
 
     # Check if the input directory exists
     if not input_dir.exists():

@@ -9,3 +9,4 @@ __pycache__/
 .venv
 scratch*/
 .vscode/
+.DS_Store
