@@ -137,11 +137,6 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        env:
-        - name: TOKENIZER_EMBED_MODEL_ID
-          value: intfloat/multilingual-e5-large
-        - name: TOKENIZER_MAX_TOKENS
-          value: '476'
         image: quay.io/atarazana/docling_chunker:v1.0.6
     exec-docling-converter:
       container:
