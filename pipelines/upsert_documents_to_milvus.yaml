@@ -5,9 +5,9 @@
 #    converted_dir_name: str [Default: 'converted']
 #    documents_bucket_folder: str [Default: 'documents']
 #    documents_dir_name: str [Default: 'documents']
+#    documents_pvc_name: str [Default: 'documents-pvc']
+#    documents_pvc_size_in_gi: int [Default: 10.0]
 #    force: bool [Default: False]
-#    images_dataset_pvc_name: str [Default: 'images-dataset-pvc']
-#    images_dataset_pvc_size_in_gi: int [Default: 10.0]
 #    milvus_collection_name: str [Default: 'document_chunks']
 #    root_mount_path: str [Default: '/opt/app-root/src']
 components:
@@ -128,7 +128,7 @@ deploymentSpec:
         - name: TOKENIZER_EMBED_MODEL_ID
           value: intfloat/multilingual-e5-large
         - name: TOKENIZER_MAX_TOKENS
-          value: '512'
+          value: '476'
         image: quay.io/atarazana/docling_chunker:v1.0.4
     exec-docling-converter:
       container:
@@ -263,9 +263,9 @@ root:
         inputs:
           parameters:
             pvc_name:
-              componentInputParameter: images_dataset_pvc_name
+              componentInputParameter: documents_pvc_name
             size_in_gi:
-              componentInputParameter: images_dataset_pvc_size_in_gi
+              componentInputParameter: documents_pvc_size_in_gi
         taskInfo:
           name: setup_storage
   inputDefinitions:
@@ -286,18 +286,18 @@ root:
         defaultValue: documents
         isOptional: true
         parameterType: STRING
+      documents_pvc_name:
+        defaultValue: documents-pvc
+        isOptional: true
+        parameterType: STRING
+      documents_pvc_size_in_gi:
+        defaultValue: 10.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
       force:
         defaultValue: false
         isOptional: true
         parameterType: BOOLEAN
-      images_dataset_pvc_name:
-        defaultValue: images-dataset-pvc
-        isOptional: true
-        parameterType: STRING
-      images_dataset_pvc_size_in_gi:
-        defaultValue: 10.0
-        isOptional: true
-        parameterType: NUMBER_INTEGER
       milvus_collection_name:
         defaultValue: document_chunks
         isOptional: true
@@ -315,7 +315,7 @@ platforms:
       executors:
         exec-add-chunks-to-milvus:
           pvcMount:
-          - componentInputParameter: images_dataset_pvc_name
+          - componentInputParameter: documents_pvc_name
             mountPath: /opt/app-root/src
           secretAsEnv:
           - keyToEnv:
@@ -340,15 +340,15 @@ platforms:
             secretName: openai-connection-embeddings
         exec-docling-chunker:
           pvcMount:
-          - componentInputParameter: images_dataset_pvc_name
+          - componentInputParameter: documents_pvc_name
             mountPath: /opt/app-root/src
         exec-docling-converter:
           pvcMount:
-          - componentInputParameter: images_dataset_pvc_name
+          - componentInputParameter: documents_pvc_name
             mountPath: /opt/app-root/src
         exec-s3-sync:
           pvcMount:
-          - componentInputParameter: images_dataset_pvc_name
+          - componentInputParameter: documents_pvc_name
             mountPath: /opt/app-root/src
           secretAsEnv:
           - keyToEnv:

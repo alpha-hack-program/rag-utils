@@ -50,8 +50,8 @@ def pipeline(
     root_mount_path: str = "/opt/app-root/src",
     documents_bucket_folder: str = "documents",
     milvus_collection_name: str = "document_chunks",
-    images_dataset_pvc_name: str = "images-dataset-pvc",
-    images_dataset_pvc_size_in_gi: int = 10,
+    documents_pvc_name: str = "documents-pvc",
+    documents_pvc_size_in_gi: int = 10,
     documents_dir_name: str = "documents",
     converted_dir_name: str = "converted",
     chunks_dir_name: str = "chunks",
@@ -59,8 +59,8 @@ def pipeline(
 ):
     
     # Define the datasets volume
-    datasets_pvc_name = images_dataset_pvc_name
-    datasets_pvc_size_in_gi = images_dataset_pvc_size_in_gi
+    datasets_pvc_name = documents_pvc_name
+    datasets_pvc_size_in_gi = documents_pvc_size_in_gi
 
     # Define the root mount path
     setup_storage_task = setup_storage_component(
