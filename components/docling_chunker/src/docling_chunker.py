@@ -90,7 +90,26 @@ def create_hybrid_chunker(
     _log.info(f"Tokenizer loaded successfully from model ID: {tokenizer_embed_model_id}")
 
     # Log tokenizer max allowed tokens
-    _log.info(f"Tokenizer max allowed tokens: {_tokenizer.model_max_length}")
+    _log.info(f"Tokenizer '{tokenizer_embed_model_id}' max allowed tokens: {_tokenizer.model_max_length}")
+
+    # If the tokenizer_max_tokens is None, set it to the tokenizer's model max length
+    if tokenizer_max_tokens is None:
+        tokenizer_max_tokens = _tokenizer.model_max_length
+        _log.info(f"Using tokenizer max tokens: {tokenizer_max_tokens} (default from tokenizer)")
+    else:
+        # If the tokenizer_max_tokens is set, check if it exceeds the tokenizer's model max length and error if it does
+        if tokenizer_max_tokens > _tokenizer.model_max_length:
+            _log.error(
+                f"Tokenizer max tokens {tokenizer_max_tokens} exceeds the tokenizer's model max length {_tokenizer.model_max_length}. "
+                "This may lead to issues with the tokenizer."
+            )
+            raise ValueError(
+                f"Tokenizer max tokens {tokenizer_max_tokens} exceeds the tokenizer's model max length {_tokenizer.model_max_length}."
+            )
+        else:
+            _log.info(
+                f"Using tokenizer max tokens: {tokenizer_max_tokens} (set by user)"
+            )
 
     # Create a HuggingFaceTokenizer with optional max_tokens
     tokenizer = HuggingFaceTokenizer(
