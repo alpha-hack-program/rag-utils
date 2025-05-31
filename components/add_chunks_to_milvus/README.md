@@ -1,0 +1,1 @@
+https://github.com/ibm-granite-community/granite-snack-cookbook/blob/main/recipes/RAG/Granite_Docling_RAG.ipynb

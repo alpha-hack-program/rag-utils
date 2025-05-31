@@ -6,7 +6,7 @@ import requests
 
 from pathlib import Path
 
-from add_chunks_to_milvus import _add_chunks_to_milvus, query_milvus
+from add_chunks_to_milvus import _add_chunks_to_milvus
 
 # Allowed log levels
 VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
