@@ -172,7 +172,7 @@ if __name__ == '__main__':
     pipeline_name=os.path.basename(__file__).replace('.py', '')
 
     compile_and_upsert_pipeline(
-        pipeline_func=pipeline,
+        pipeline_func=pipeline, # type: ignore
         pipeline_package_path=pipeline_package_path,
         pipeline_name=pipeline_name
     )

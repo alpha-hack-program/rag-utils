@@ -1,3 +1,4 @@
+from math import e
 import os
 import hashlib
 import logging
@@ -6,6 +7,7 @@ import requests
 import json
 
 from datetime import datetime
+from typing import Optional
 
 from tqdm import tqdm
 
@@ -53,20 +55,29 @@ milvus_username = os.environ.get('MILVUS_USERNAME')
 milvus_password = os.environ.get('MILVUS_PASSWORD')
 
 # Get the OpenAI connection details
-openai_api_key = os.environ.get('OPENAI_API_KEY')
+openai_api_key = os.environ.get('OPENAI_API_KEY', '')
 openai_api_model = os.environ.get('OPENAI_API_MODEL')
 openai_api_embeddings_url = os.environ.get('OPENAI_API_BASE')
 
 def query_milvus(
     collection_name: str,
     query_text: str,
-    top_k: int = 5,
-    params: dict = None,
+    params: Optional[dict] = None,
+    expr: Optional[str] = None,
+    top_k: int = 10,
     timeout: int = 30,
 ) -> list:
     """
     Perform a vector search on a Milvus collection.
     """
+    # Validate input parameters
+    if not collection_name:
+        raise ValueError("Collection name is not set.")
+    if not query_text:
+        raise ValueError("Query text is not set.")
+    if not milvus_database or not milvus_host or not milvus_port or not milvus_username or not milvus_password:
+        raise ValueError("Missing required environment variables for Milvus connection.")
+
     # Connect to Milvus
     connections.connect(
         alias="default",
@@ -98,13 +109,13 @@ def query_milvus(
         anns_field="vector",
         param=params,
         limit=top_k,
-        expr=None,  # You can add filtering expressions here if needed
+        expr=expr,
         output_fields=["id", "content", "source"],
         timeout=timeout,
     )
 
-    # Extract the top_k results
-    hits = results[0]  # one query, so results[0] is the list of hits
+    # Extract the top_k results one query, so results[0] is the list of hits
+    hits = results[0]  # type: ignore 
     return [
         {
             "id": hit.id,
@@ -155,6 +166,11 @@ def check_milvus_connection():
     Raises:
         Exception: If the connection to Milvus fails.
     """
+    # Validate Milvus connection parameters
+    if not milvus_database or not milvus_host or not milvus_port or not milvus_username or not milvus_password:
+        raise ValueError("Missing required environment variables for Milvus connection.")
+    
+    _log.info("Checking connection to Milvus...")
     try:
         connections.connect(
             alias="default",
@@ -181,14 +197,38 @@ def compute_content_hash(content: str) -> str:
     """
     return hashlib.sha256(content.encode('utf-8')).hexdigest()
 
+def use_preferred_embedding_template(content: str) -> str:
+    """
+    Use the preferred template for the model to generate the embedding.
+    
+    Args:
+        content (str): Content to embed.
+        
+    Returns:
+        str: Content with the preferred template applied.
+    """
+    # If the OpenAI API model is not set, return the content as is
+    if not openai_api_model:
+        _log.warning("OpenAI API model is not set. Using content as is.")
+        return content
+
+    # If model name starts with multilingual-e5-large, use the preferred template
+    if openai_api_model.startswith("multilingual-e5-large"):
+        # Use the preferred template for multilingual-e5-large
+        content = f"passage: {content}"
+    
+    return content
+
 def get_embedding(
     content: str,
+    use_preferred_template: bool = True,
 ):
     """
     Get embedding for the content using OpenAI API.
     
     Args:
         content (str): Content to embed.
+        use_preferred_template (bool): Whether to use the preferred template for the model to generate the embedding.
         
     Returns:
         list: Embedding vector.
@@ -196,6 +236,11 @@ def get_embedding(
     Raises:
         requests.exceptions.RequestException: If the connection to OpenAI API fails.
     """
+
+    # If use_prefered_template is True, use the preferred prefix for the model
+    if use_preferred_template:
+        content = use_preferred_embedding_template(content)
+
     headers = {
         "Content-Type": "application/json",
     }
@@ -304,12 +349,29 @@ def process_document_chunks(
 
             # Add embedding, source, content, content_hash, page number, origin, headings, captions, doc_items, timestamp to the lists
             embeddings.append(embedding)
-            sources.append(doc_chunk.meta.origin.filename)
+            if doc_chunk.meta.origin and doc_chunk.meta.origin.filename:
+                # Use the filename from the origin if available
+                sources.append(doc_chunk.meta.origin.filename)
+            else:
+                # Fallback to the file name of the json file
+                _log.warning(f"No origin filename found in {file}. Using file name as source.")
+                sources.append(file.name)
             contents.append(contextualized_content)
             content_hashes.append(content_hash)
             page_numbers_min.append(page_number_min)
             page_numbers_max.append(page_number_max)
-            origins.append(doc_chunk.meta.origin.model_dump())
+            if doc_chunk.meta.origin:
+                # If origin is available, use its model_dump() method to convert to dict
+                # This assumes origin is a Pydantic model or similar
+                if hasattr(doc_chunk.meta.origin, "model_dump"):
+                    origins.append(doc_chunk.meta.origin.model_dump())
+                else:
+                    _log.warning(f"Origin does not have model_dump method: {doc_chunk.meta.origin}")
+                    origins.append(str(doc_chunk.meta.origin))
+            else:
+                # If origin is not available, append an empty dict
+                _log.warning(f"No origin found in {file}. Appending empty dict.")
+                origins.append({})
             headings.append(joined_headings)
             captions.append("\n".join(doc_chunk.meta.captions) if doc_chunk.meta.captions else "")
             # doc_items.append(doc_chunk.meta.doc_items)
@@ -393,6 +455,16 @@ def init(
     Returns:
         Collection: Milvus collection object
     """
+    # Validate input parameters
+    if not milvus_collection_name:
+        raise ValueError("Milvus collection name is not set.")
+    if not embedding_dim or embedding_dim <= 0:
+        raise ValueError("Embedding dimension is not set.")
+    
+    # Validate Milvus connection parameters
+    if not milvus_database or not milvus_host or not milvus_port or not milvus_username or not milvus_password:
+        raise ValueError("Missing required environment variables for Milvus connection.")
+
     try:
         # Connect to Milvus
         connections.connect(
@@ -554,6 +626,20 @@ def _add_chunks_to_milvus(
     Returns:
         Tuple[list[Path], list[Path]]: Lists of successfully added, and failed.
     """
+
+    # Validate input parameters
+    if not input_dir:
+        raise ValueError("Input directory is not set.")
+    if not milvus_collection_name:
+        raise ValueError("Milvus collection name is not set.")
+    # Validate Milvus connection parameters
+    if not milvus_database or not milvus_host or not milvus_port or not milvus_username or not milvus_password:
+        raise ValueError("Missing required environment variables for Milvus connection.")
+
+    # Validate OpenAI connection parameters
+    if not openai_api_model or not openai_api_embeddings_url:
+        raise ValueError("Missing required environment variables for OpenAI connection to generate embeddings.")
+
     # Log input directory
     _log.info(f"Input directory: {input_dir}")
 
@@ -588,14 +674,8 @@ def _add_chunks_to_milvus(
     check_openai_embeddings_connection()
     
     # Set embedding dimension based on the model
-    if openai_api_model == "/mnt/models": # NOMIC in MaaS
-        embedding_dim = 768
-    elif openai_api_model == "multilingual-e5-large":
+    if openai_api_model.startswith("multilingual-e5-large"):
         embedding_dim = 1024
-    elif openai_api_model == "multilingual-e5-large-gpu":
-        embedding_dim = 1024
-    elif openai_api_model == "text-embedding-curie-001":
-        embedding_dim = 768
     else:
         raise ValueError(f"Unsupported OpenAI model: {openai_api_model}")
     # Log the embedding dimension
@@ -744,6 +824,6 @@ def add_chunks_to_milvus(
 if __name__ == "__main__":
     component_package_path = __file__.replace('.py', '.yaml')
     compiler.Compiler().compile(
-        pipeline_func=add_chunks_to_milvus,
+        pipeline_func=add_chunks_to_milvus, # type: ignore
         package_path=component_package_path
     )

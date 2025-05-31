@@ -2,6 +2,7 @@ import os
 import logging
 import time
 import argparse
+import json
 
 from pathlib import Path
 
@@ -19,6 +20,16 @@ logging.getLogger('docling').setLevel(logging.ERROR)
 # Create a logger for this module
 _log = logging.getLogger(__name__)
 
+def refresh_input_dir(input_dir: Path):
+    """
+    Deletes all files ending with '.chunked' in the given directory.
+    """
+    for file in input_dir.rglob("*.chunked"):
+        try:
+            file.unlink()
+        except Exception as e:
+            logging.warning(f"Could not delete {file}: {e}")
+
 def main():
     # Validate and set level
     if LOG_LEVEL_STR in VALID_LOG_LEVELS:
@@ -33,21 +44,39 @@ def main():
     parser = argparse.ArgumentParser(description="Parse outputdir, basedir, and a list of files.")
     
     parser.add_argument(
+        '--inputdir',
+        required=True,
+        help='Path to the input directory'
+    )
+
+    parser.add_argument(
         '--outputdir',
         required=True,
         help='Path to the output directory'
     )
     
+    # Add an optional boolean argument to start fresh called --refresh
     parser.add_argument(
-        '--inputdir',
-        required=True,
-        help='Path to the input directory'
+        '--refresh',
+        required=False,
+        help='Delete all *.chunked files in the input directory before starting'
     )
 
     args = parser.parse_args()
 
     print(f"Input directory: {args.inputdir}")
     print(f"Output directory: {args.outputdir}")
+    print(f"Refresh input directory: {args.refresh}")
+
+    # Validate the input directory
+    input_dir = Path(args.inputdir)
+    if not input_dir.is_dir():
+        raise ValueError(f"Input directory '{args.inputdir}' does not exist or is not a directory.")
+
+    # Delete all *.chunked files in the input directory if --fresh is specified
+    if args.refresh:
+        print("Starting fresh, deleting all *.chunked files...")
+        refresh_input_dir(input_dir=input_dir)
 
     # Get TOKENIZER_EMBED_MODEL_ID from environment variable or use default
     tokenizer_embed_model_id = os.getenv("TOKENIZER_EMBED_MODEL_ID", "intfloat/multilingual-e5-large")
@@ -71,13 +100,15 @@ def main():
         merge_peers=merge_peers
     )
 
-    # Log the conversion results
-    _log.info(
-        f"Successfully converted: {success}"
-    )
-    _log.info(
-        f"Failed to convert: {failure}"
-    )
+    results = json.dumps({
+        "success": [
+            {"path": str(path), "chunks": chunks} for path, chunks in success.items()
+        ],
+        "failure": [str(path) for path in failure]
+    })
+
+    # Log the results
+    _log.info(f"Chunking results: {results}")
 
     # Stop the timer
     end_time = time.time() - start_time

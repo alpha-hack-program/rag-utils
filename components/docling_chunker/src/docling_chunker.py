@@ -4,17 +4,18 @@ import logging
 
 from pathlib import Path
 
+from typing import Optional
+
 from tqdm import tqdm
 
-from docling.chunking import (
+from docling_core.types.doc.document import DoclingDocument
+from docling_core.transforms.chunker.hybrid_chunker import (
     HybridChunker
 )
-
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
-from transformers import AutoTokenizer
-
 from docling.datamodel.base_models import InputFormat
-from docling.datamodel.document import DoclingDocument
+
+from transformers import AutoTokenizer
 
 from shared.rag_utils import is_chunked, mark_file_chunked
 
@@ -57,15 +58,15 @@ logging.getLogger('docling').setLevel(logging.ERROR)
 _log = logging.getLogger(__name__)
 
 def create_hybrid_chunker(
-    tokenizer_embed_model_id: str = None,
-    tokenizer_max_tokens: int = None,
+    tokenizer_embed_model_id: Optional[str] = None,
+    tokenizer_max_tokens: Optional[int] = None,
     merge_peers: bool = True,
 ) -> HybridChunker:
     """
     Create a HybridChunker with the specified parameters.
     Args:
-        tokenizer_embed_model_id (str): The ID of the tokenizer to use for embedding.
-        tokenizer_max_tokens (int): The maximum number of tokens to use for the tokenizer.
+        tokenizer_embed_model_id (Optional[str]): The model ID of the tokenizer to use. If None, a default HybridChunker is created.
+        tokenizer_max_tokens (Optional[int]): The maximum number of tokens for the tokenizer. If None, it defaults to the tokenizer's model max length.
         merge_peers (bool): Whether to merge peers.
     Returns:
         HybridChunker: A HybridChunker instance.
@@ -131,7 +132,7 @@ def chunk_batch(
     input_dir: Path,
     output_dir: Path,
     raises_on_error: bool = False,
-) -> tuple[dict, list[Path]]:
+) -> tuple[dict[Path,int], list[Path]]:
     """
     Chunk a batch of documents using the specified chunker. Returns a dictionary with the chunks per document.
     The chunked documents are saved in the specified output directory.
@@ -148,7 +149,7 @@ def chunk_batch(
     """
     
     # List of successfully chunked documents
-    chunked_documents = {}
+    chunked_documents: dict[Path,int] = {}
     # List of failed documents
     failed_documents = []
 
@@ -170,6 +171,9 @@ def chunk_batch(
             _log.info(f"Chunking document: {doc_file}")
             
             # Get the hash of the document
+            if not doc.origin or not doc.origin.binary_hash:
+                _log.error(f"Document {doc_file} does not have a valid origin or binary hash. Skipping.")
+                raise ValueError(f"Document {doc_file} does not have a valid origin or binary hash.")
             doc_hash = doc.origin.binary_hash
 
             # Chunk the document
@@ -220,10 +224,10 @@ def chunk_batch(
 def _docling_chunker(
     input_dir: Path,
     output_dir: Path,
-    tokenizer_embed_model_id: str = None,
-    tokenizer_max_tokens: int = None,
+    tokenizer_embed_model_id: Optional[str] = None,
+    tokenizer_max_tokens: Optional[int] = None,
     merge_peers: bool = True,
-) -> tuple[list[str], list[str]]:
+) -> tuple[dict[Path,int], list[Path]]:
     """
     Chunk documents using the Docling chunker.
     Args:
@@ -300,9 +304,9 @@ def _docling_chunker(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # List of successfully chunked documents
-    succesfully_chunked_documents = {}
+    succesfully_chunked_documents: dict[Path,int] = {}
     # List of failed documents
-    failed_documents = []
+    failed_documents: list[Path] = []
 
     # Chunker
     chunker = create_hybrid_chunker(
@@ -328,16 +332,16 @@ def _docling_chunker(
         # Append the failed documents to the list of failed documents
         failed_documents.extend(_failed_documents)
         
-    # Log the total number of documents processed
+    # Log the total number of documents chunked
     _log.info(
-        f"Processed a total of {len(input_doc_paths)} documents"
+        f"Chunked a total of {len(input_doc_paths)} documents"
     )
     # Return the counts of successful, partial success, and failure
     success_count = len(succesfully_chunked_documents)
     failure_count = len(failed_documents)
-    # Log the total number of documents processed
+    # Log the total number of documents chunked and failed
     _log.info(
-        f"Processed {success_count + failure_count} docs, "
+        f"Chunked {success_count + failure_count} docs, "
         f"of which {failure_count} failed"
     )
     # Return the lists of successful, partial success, and failure conversions
@@ -356,8 +360,8 @@ def docling_chunker(
     root_mount_path: str,
     input_dir_name: str,
     output_dir_name: str,
-    tokenizer_embed_model_id: str = None,
-    tokenizer_max_tokens: int = None,
+    tokenizer_embed_model_id: Optional[str] = None,
+    tokenizer_max_tokens: Optional[int] = None,
     merge_peers: bool = True,
 ) -> str:
     """
@@ -404,7 +408,9 @@ def docling_chunker(
     
     # return the lists as a json string
     return json.dumps({
-        "success": [str(path) for path in success],
+        "success": [
+            {"path": str(path), "chunks": chunks} for path, chunks in success.items()
+        ],
         "failure": [str(path) for path in failure]
     })
     
@@ -412,5 +418,5 @@ if __name__ == "__main__":
     # Generate and save the component YAML file
     component_package_path = __file__.replace('.py', '.yaml')
 
-    docling_chunker.save_component_yaml(component_package_path)
+    docling_chunker.save_component_yaml(component_package_path) # type: ignore
 

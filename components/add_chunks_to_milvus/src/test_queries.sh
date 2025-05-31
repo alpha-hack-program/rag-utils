@@ -30,4 +30,4 @@ echo "OPENAI_API_BASE_COMPLETIONS: $OPENAI_API_BASE_COMPLETIONS"
 export PYTHONPATH=$(cd "$(dirname "$0")"/../../ && pwd)
 
 # Run the test script with DEBUG log level with all the arguments
-LOG_LEVEL=INFO python test.py $@
+LOG_LEVEL=INFO python test_queries.py $@
