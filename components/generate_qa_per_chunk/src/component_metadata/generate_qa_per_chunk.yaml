@@ -1,0 +1,93 @@
+# PIPELINE DEFINITION
+# Name: generate-qa-per-chunk
+# Inputs:
+#    input_dir_name: str
+#    number_of_questions: int [Default: 3.0]
+#    root_mount_path: str
+# Outputs:
+#    Output: str
+components:
+  comp-generate-qa-per-chunk:
+    executorLabel: exec-generate-qa-per-chunk
+    inputDefinitions:
+      parameters:
+        input_dir_name:
+          description: Name of the input directory containing chunk directories.
+          parameterType: STRING
+        number_of_questions:
+          defaultValue: 3.0
+          description: Number of questions to generate for each chunk.
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        root_mount_path:
+          description: Root mount path where the input directory is located.
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-generate-qa-per-chunk:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - generate_qa_per_chunk
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'docling-core==2.31.0'\
+          \ 'requests==2.32.3' && \"$0\" \"$@\"\n"
+        - python3
+        - -m
+        - kfp.dsl.executor_main
+        image: quay.io/atarazana/generate_qa_per_chunk:v1.0.1
+pipelineInfo:
+  name: generate-qa-per-chunk
+root:
+  dag:
+    outputs:
+      parameters:
+        Output:
+          valueFromParameter:
+            outputParameterKey: Output
+            producerSubtask: generate-qa-per-chunk
+    tasks:
+      generate-qa-per-chunk:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-generate-qa-per-chunk
+        inputs:
+          parameters:
+            input_dir_name:
+              componentInputParameter: input_dir_name
+            number_of_questions:
+              componentInputParameter: number_of_questions
+            root_mount_path:
+              componentInputParameter: root_mount_path
+        taskInfo:
+          name: generate-qa-per-chunk
+  inputDefinitions:
+    parameters:
+      input_dir_name:
+        description: Name of the input directory containing chunk directories.
+        parameterType: STRING
+      number_of_questions:
+        defaultValue: 3.0
+        description: Number of questions to generate for each chunk.
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      root_mount_path:
+        description: Root mount path where the input directory is located.
+        parameterType: STRING
+  outputDefinitions:
+    parameters:
+      Output:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.10.1
