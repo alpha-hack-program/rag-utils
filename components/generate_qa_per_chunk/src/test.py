@@ -43,6 +43,12 @@ def main():
         required=True,
         help='Number of questions to generate per chunk'
     )
+
+    parser.add_argument(
+        '--cleanup',
+        action='store_true',
+        help='Cleanup the input directory (deletes *.csv)',
+    )
     
     args = parser.parse_args()
 
@@ -61,10 +67,15 @@ def main():
     # Start the timer
     start_time = time.time()
 
+    # Cleanup the input directory if specified
+    _log.info(f"Clean up: {args.cleanup}")
+
     # Generate QA per chunk
     success, failure = _generate_qa_per_chunk(
         input_dir=Path(args.inputdir),
         number_of_questions=int(args.questions),
+        cleanup=args.cleanup,
+        merge_csv=True,
     )
 
     # Log the conversion results
@@ -78,7 +89,7 @@ def main():
     # Stop the timer
     end_time = time.time() - start_time
 
-    _log.info(f"Chunks insertion complete in {end_time:.2f} seconds.")
+    _log.info(f"QA generation complete in {end_time:.2f} seconds.")
     
 if __name__ == "__main__":
     main()

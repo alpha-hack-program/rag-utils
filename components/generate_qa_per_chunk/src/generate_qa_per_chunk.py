@@ -1,8 +1,11 @@
+from ast import pattern
 import os
 import hashlib
 import logging
+import time
 import requests
 import json
+import csv
 
 from tqdm import tqdm
 
@@ -73,6 +76,28 @@ Generate '{number_of_questions}' questions and answers based on this context:
 ```
 """
 
+RESPONSE_FORMAT_SCHEMA = {
+  "type": "json_object",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "questions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "question": { "type": "string" },
+            "answer": { "type": "string" }
+          },
+          "required": ["question", "answer"]
+        }
+      }
+    },
+    "required": ["questions"]
+  }
+}
+
+MINIMUM_CHUNK_LENGTH_FOR_QA = 512  # Minimum length of chunk text to be considered for QA generation
 MAX_TOKENS = 512  # Maximum number of tokens for the response
 MAX_QUESTIONS = 5  # Maximum number of questions to generate
 TEMPERATURE = 1.0  # Temperature for the model response
@@ -151,11 +176,26 @@ def response_format(model: str) -> dict[str, str] | str | None:
     """
     if not model:
         return None
-    if model.startswith("deepseek"):
+    
+    # If model contains deepseek (ignore case), return {"type": "json_object"}
+    if "deepseek" in model.lower():
+        _log.debug(f"Using response format JSON for DeepSeek model: {model}")
         return {"type": "json_object"}
-    elif model.startswith("granite"):
+    # If model contains mixtral or mistral (ignore case), return {"type": "json_object"}
+    elif "mixtral" in model.lower() or "mistral" in model.lower():
+        _log.debug(f"Using response format JSON for Mixtral/Mistral model: {model}")
+        return {"type": "json_object"}
+    # If model contains granite (ignore case), return None
+    elif "granite" in model.lower():
+        _log.debug(f"Using response format None for Granite model: {model}")
         return None
-    return None
+    # If model contains llama (ignore case), return json_object
+    elif "llama" in model.lower():
+        _log.debug(f"Using response format JSON SCHEMA for Llama model: {model}")
+        return RESPONSE_FORMAT_SCHEMA
+    # By default, return None for other models
+    _log.debug(f"Using default response format None for model: {model}")
+    return "None"
 
 def generate_questions_and_answers(
     context: str,
@@ -232,6 +272,60 @@ def generate_questions_and_answers(
 
     return answer
 
+def evaluate_chunk_for_qa(doc_chunk: DocChunk) -> tuple[bool, str]:
+    """
+    Evaluate a DocChunk to decide if it should be processed for QA generation.
+    
+    Args:
+        doc_chunk (DocChunk): The document chunk to evaluate.
+        
+    Returns:
+        tuple[bool, str]: A tuple containing a boolean indicating whether the chunk should be processed,
+                          and a reason for the decision.
+    """
+    # Check if the chunk is empty
+    if not doc_chunk.text.strip():
+        return False, "Chunk is empty."
+    
+    # Check if chunk text is too short
+    if len(doc_chunk.text.strip()) < MINIMUM_CHUNK_LENGTH_FOR_QA:
+        return False, f"Chunk text is too short. Minimum length is {MINIMUM_CHUNK_LENGTH_FOR_QA} characters."
+
+    # Check if the chunk has headings
+    if not doc_chunk.meta.headings:
+        return False, "Chunk has no headings."
+    
+    # If all checks pass, process the chunk
+    return True, "Chunk is valid for processing."
+
+def generate_safe_filestem(text: str) -> str:
+    """
+    Generate a filesystem-safe name for the text provided.
+    
+    Args:
+        text (str): The text to generate a filesystem-safe name for.
+        
+    Returns:
+        str: A filesystem-safe name derived from the text.
+
+    Raises:
+        ValueError: If the text is None or empty.
+    """
+    # Fail if model_name is None or empty
+    if not text:
+        raise ValueError("Model name is not set or empty.")
+
+    # Replace any non-alphanumeric characters with underscores
+    return "".join(c if c.isalnum() else "_" for c in text).lower()
+
+def escape_for_csv_column(value: str) -> str:
+    import csv, io
+    output = io.StringIO()
+    writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
+    writer.writerow([value])
+    return output.getvalue().strip('\r\n')
+
+
 def process_document_chunks(
     document_chunks_path: Path,
     number_of_questions: int,
@@ -247,6 +341,10 @@ def process_document_chunks(
     Returns:
         None
     """
+    # Validate model name and embeddings URL
+    if not openai_api_model or not openai_api_embeddings_url:
+        raise ValueError("Missing required environment variables for OpenAI connection to generate embeddings.")
+
     # Check if the input directory exists
     if not document_chunks_path.exists():
         raise ValueError(f"Input directory {document_chunks_path} does not exist.")
@@ -271,7 +369,13 @@ def process_document_chunks(
             # Convert the json file to a DocChunk object
             doc_chunk = DocChunk.model_validate_json(data)
 
-            # Contextualize the chunk by adding the headings joined by \n
+            # Evaluate chunk to decide if it should be processed
+            process_chunk, reason = evaluate_chunk_for_qa(doc_chunk)
+            if not process_chunk:
+                _log.debug(f"Skipping chunk {file} due to: {reason}")
+                continue
+
+            # Contextualize the chunk by adding the headings joined by spaces
             joined_headings = "\n".join(doc_chunk.meta.headings) if doc_chunk.meta.headings else ""
             contextualized_content = f"{joined_headings}\n{doc_chunk.text}" if joined_headings else doc_chunk.text
 
@@ -279,7 +383,8 @@ def process_document_chunks(
             content_hash = compute_content_hash(contextualized_content)
 
             # QA filename to be generated
-            qa_filename = f"{file.stem}_{content_hash}_qa.csv"
+            model_name = generate_safe_filestem(openai_api_model)
+            qa_filename = f"{file.stem}_{content_hash}_{model_name}_qa.csv"
 
             # Check if the file already exists
             qa_file_path = document_chunks_path / qa_filename
@@ -294,28 +399,33 @@ def process_document_chunks(
                 prompt_template=prompt_template,
             )
 
-            # Write the questions and answers to a csv file
-            with open(qa_file_path, "w") as qa_file:
+            # Write the questions and answers to a CSV file using csv module
+            with open(qa_file_path, "w", newline='', encoding='utf-8') as qa_file:
+                writer = csv.writer(qa_file, quoting=csv.QUOTE_MINIMAL)
+
                 # Write the header
-                qa_file.write("document_filename,chunk_filename,model,question,answer\n")
-                # Parse the JSON string which has this format:
-                # {"questions":[{"question": "What is the highest mountain on Earth?", "answer": "Mount Everest"}, ...] }
+                writer.writerow(["document_filename", "chunk_filename", "model", "timestamp", "question", "answer", "context"])
+
+                # Parse the JSON string
                 questions_and_answers = json.loads(json_string)
-                # Write each question and answer to the file
+
                 for question_answer in questions_and_answers.get("questions", []):
                     if doc_chunk.meta.origin and doc_chunk.meta.origin.filename:
-                        # Use the filename from the origin if available
                         document_filename = doc_chunk.meta.origin.filename
                     else:
-                        # Fallback to the file name if origin is not available
                         _log.warning(f"Origin filename not available for chunk {file}. Using chunk file name instead.")
                         document_filename = file.stem
+
                     chunk_filename = f"{file.stem}.json"
                     model = openai_api_model or "unknown"
+                    timestamp = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
                     question = question_answer.get("question", "")
                     answer = question_answer.get("answer", "")
-                    
-                    qa_file.write(f'"{document_filename}","{chunk_filename}","{model}","{question}","{answer}"\n')
+                    context = contextualized_content
+
+                    # Write the row
+                    writer.writerow([document_filename, chunk_filename, model, timestamp, question, answer, context])
+
             _log.debug(f"Generated QA file: {qa_file_path}")
 
             # Count the number of chunks processed
@@ -366,9 +476,83 @@ def process_batch_of_document_chunks(
 
     return sucesses, failures
 
+def merge_all_csv_files_for_model(input_dir: Path, output_file: Path) -> None:
+    """
+    Merge all CSV files in the input directory into a single CSV file using the csv module.
+    This function will create the output file if it does not exist, and overwrite it if it does.
+    Args:
+        input_dir (Path): Path to the input directory containing CSV files.
+        output_file (Path): Path to the output CSV file.
+    """
+    if not input_dir.exists():
+        raise ValueError(f"Input directory {input_dir} does not exist.")
+
+    if not openai_api_model:
+        raise ValueError("OpenAI API model is not set. Please set the OPENAI_API_MODEL environment variable.")
+
+    # Merging these files *_{model_name}_qa.csv
+    pattern = f"*_{generate_safe_filestem(openai_api_model)}_qa.csv"
+    csv_files = list(input_dir.rglob(pattern))
+    if not csv_files:
+        _log.warning(f"No CSV files found in {input_dir}.")
+        return
+
+    # Clean up the output file if it exists
+    if output_file.exists():
+        _log.info(f"Output file {output_file} already exists. Deleting it.")
+        output_file.unlink()
+
+    # Create the output file
+    with output_file.open("w", newline='', encoding='utf-8') as out_f:
+        writer = None
+
+        for idx, file_path in enumerate(csv_files):
+            with file_path.open("r", newline='', encoding='utf-8') as in_f:
+                reader = csv.reader(in_f)
+                header = next(reader, None)
+
+                if header is None:
+                    _log.warning(f"Skipping empty file: {file_path}")
+                    continue
+
+                if writer is None:
+                    writer = csv.writer(out_f)
+                    writer.writerow(header)
+                elif idx == 0:
+                    writer.writerow(header)  # write header from the first file only
+
+                for row in reader:
+                    writer.writerow(row)
+
+    _log.info(f"Merged {len(csv_files)} CSV files into {output_file}.")
+
+def delete_all_csv_files(input_dir: Path) -> None:
+    """
+    Delete all CSV files in the input directory.
+    Args:
+        input_dir (Path): Path to the input directory containing CSV files.
+    """
+    if not input_dir.exists():
+        raise ValueError(f"Input directory {input_dir} does not exist.")
+
+    csv_files = list(input_dir.rglob("*.csv"))
+    if not csv_files:
+        _log.warning(f"No CSV files found in {input_dir}.")
+        return
+
+    for file_path in csv_files:
+        try:
+            file_path.unlink()
+            _log.info(f"Deleted CSV file: {file_path}")
+        except Exception as e:
+            _log.error(f"Failed to delete {file_path}: {e}")
+
 def _generate_qa_per_chunk(
     input_dir: Path,
     number_of_questions: int,
+    cleanup: bool,
+    merge_csv: bool = False,
+    merged_csv_filestem_prefix: str = "merged_qa",
     prompt_template: str = USER_PROMPT_TEMPLATE,
 ) -> tuple[list[Path], list[Path]]:
     """
@@ -393,6 +577,11 @@ def _generate_qa_per_chunk(
     # Validate OpenAI connection parameters
     if not openai_api_model or not openai_api_embeddings_url:
         raise ValueError("Missing required environment variables for OpenAI connection to generate embeddings.")
+
+    # Fail if merged_csv_filestem_prefix is empty
+    if not merged_csv_filestem_prefix.strip():
+        _log.warning("Merged CSV file stem prefix is not set.")
+        raise ValueError("Merged CSV file stem prefix is not set.")
 
     # Log input directory
     _log.info(f"Input directory: {input_dir}")
@@ -439,6 +628,14 @@ def _generate_qa_per_chunk(
         f"Created {len(batches)} batches of chunk dirs, each with a maximum of {MAX_INPUT_DOCS} dirs."
     )    
 
+    # We're ready to process the batches of chunk directories
+    _log.info("Processing batches of chunk directories...")
+
+    # if we have to cleanup, delete all CSV files in the input directory
+    if cleanup:
+        _log.info("Cleaning up CSV files in the input directory...")
+        delete_all_csv_files(input_dir)
+
     # List of successfully inserted sets of chunks
     succesfully_added_chunk_sets = []
     # List of failed sets of chunks
@@ -475,6 +672,19 @@ def _generate_qa_per_chunk(
         f"Processed {success_count  + failure_count} docs, "
         f"of which {failure_count} failed"
     )
+
+    # If merge_csv is True, merge all CSV files in the input directory into a single CSV file
+    if merge_csv:
+        timestamp = time.strftime("%Y%m%dT%H%M%S", time.gmtime())
+        merged_filestem = generate_safe_filestem(f"{merged_csv_filestem_prefix}_{openai_api_model}_{timestamp}")
+        merged_csv_file = input_dir / f"{merged_filestem}.csv"
+        # Log the merging of CSV files
+        _log.info(f"Merging all CSV files in {input_dir} into {merged_csv_file}.")
+        merge_all_csv_files_for_model(input_dir=input_dir, output_file=merged_csv_file)
+        _log.info(f"Merged CSV file created at: {merged_csv_file}")
+    else:
+        _log.info("Skipping merging of CSV files as merge_csv is set to False.")
+
     # Return the lists of successful, partial success, and failure conversions
     return (
         succesfully_added_chunk_sets,
@@ -493,7 +703,10 @@ def _generate_qa_per_chunk(
 def generate_qa_per_chunk(
     root_mount_path: str,
     input_dir_name: str,
-    number_of_questions: int = 3,
+    number_of_questions: int,
+    cleanup: bool = False,
+    merge_csv: bool = True,
+    merged_csv_filestem_prefix: str = "merged_qa",
 ) -> str:
     """
     Generate questions and answers for each chunk in the input directory and save them as CSV files.
@@ -535,7 +748,9 @@ def generate_qa_per_chunk(
     success, failure = _generate_qa_per_chunk(
         input_dir=input_dir,
         number_of_questions=number_of_questions,
-        prompt_template=USER_PROMPT_TEMPLATE,
+        cleanup=cleanup,
+        merge_csv=merge_csv,
+        merged_csv_filestem_prefix=merged_csv_filestem_prefix,
     )
 
     # Log the number of successfully added and failed chunk directories
