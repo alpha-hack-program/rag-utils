@@ -6,7 +6,8 @@ CONTAINER_NAME="open-webui"
 HOST_PORT=3000
 # LLM_HOST=$(ipconfig getifaddr en0)
 # LLM_PORT=8888
-LLM_HOST=192.168.50.20
+# LLM_HOST=192.168.50.20
+LLM_HOST=host.containers.internal
 LLM_PORT=7777
 
 
