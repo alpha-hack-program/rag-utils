@@ -16,7 +16,7 @@ API_BASE_URL="http://${LLM_HOST}:${LLM_PORT}/v1"
 echo "➡️ API_BASE_URL=${API_BASE_URL}"
 
 # Run the container
-docker run -d \
+podman run -d \
   --name "${CONTAINER_NAME}" \
   -p ${HOST_PORT}:8080 \
   -e OPENAI_API_BASE_URL="${API_BASE_URL}" \
