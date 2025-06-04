@@ -4,10 +4,10 @@
 WEBUI_IMAGE="ghcr.io/open-webui/open-webui:main"
 CONTAINER_NAME="open-webui"
 HOST_PORT=3000
-LLM_HOST=$(ipconfig getifaddr en0)
-LLM_PORT=8888
-# LLM_HOST=192.168.50.20
-# LLM_PORT=7777
+# LLM_HOST=$(ipconfig getifaddr en0)
+# LLM_PORT=8888
+LLM_HOST=192.168.50.20
+LLM_PORT=7777
 
 
 API_KEY="NA"  # Dummy key for OpenAI-compatible APIs
