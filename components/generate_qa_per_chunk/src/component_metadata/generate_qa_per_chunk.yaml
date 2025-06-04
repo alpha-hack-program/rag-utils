@@ -1,8 +1,12 @@
 # PIPELINE DEFINITION
 # Name: generate-qa-per-chunk
 # Inputs:
+#    cleanup: bool [Default: False]
 #    input_dir_name: str
-#    number_of_questions: int [Default: 3.0]
+#    merge_csv: bool [Default: True]
+#    merged_csv_filestem_prefix: str [Default: 'merged_qa']
+#    number_of_questions: int
+#    output_dir_name: str
 #    root_mount_path: str
 # Outputs:
 #    Output: str
@@ -11,14 +15,26 @@ components:
     executorLabel: exec-generate-qa-per-chunk
     inputDefinitions:
       parameters:
+        cleanup:
+          defaultValue: false
+          isOptional: true
+          parameterType: BOOLEAN
         input_dir_name:
           description: Name of the input directory containing chunk directories.
           parameterType: STRING
-        number_of_questions:
-          defaultValue: 3.0
-          description: Number of questions to generate for each chunk.
+        merge_csv:
+          defaultValue: true
           isOptional: true
+          parameterType: BOOLEAN
+        merged_csv_filestem_prefix:
+          defaultValue: merged_qa
+          isOptional: true
+          parameterType: STRING
+        number_of_questions:
+          description: Number of questions to generate for each chunk.
           parameterType: NUMBER_INTEGER
+        output_dir_name:
+          parameterType: STRING
         root_mount_path:
           description: Root mount path where the input directory is located.
           parameterType: STRING
@@ -64,24 +80,44 @@ root:
           name: comp-generate-qa-per-chunk
         inputs:
           parameters:
+            cleanup:
+              componentInputParameter: cleanup
             input_dir_name:
               componentInputParameter: input_dir_name
+            merge_csv:
+              componentInputParameter: merge_csv
+            merged_csv_filestem_prefix:
+              componentInputParameter: merged_csv_filestem_prefix
             number_of_questions:
               componentInputParameter: number_of_questions
+            output_dir_name:
+              componentInputParameter: output_dir_name
             root_mount_path:
               componentInputParameter: root_mount_path
         taskInfo:
           name: generate-qa-per-chunk
   inputDefinitions:
     parameters:
+      cleanup:
+        defaultValue: false
+        isOptional: true
+        parameterType: BOOLEAN
       input_dir_name:
         description: Name of the input directory containing chunk directories.
         parameterType: STRING
-      number_of_questions:
-        defaultValue: 3.0
-        description: Number of questions to generate for each chunk.
+      merge_csv:
+        defaultValue: true
         isOptional: true
+        parameterType: BOOLEAN
+      merged_csv_filestem_prefix:
+        defaultValue: merged_qa
+        isOptional: true
+        parameterType: STRING
+      number_of_questions:
+        description: Number of questions to generate for each chunk.
         parameterType: NUMBER_INTEGER
+      output_dir_name:
+        parameterType: STRING
       root_mount_path:
         description: Root mount path where the input directory is located.
         parameterType: STRING

@@ -39,6 +39,12 @@ def main():
     )
 
     parser.add_argument(
+        '--outputdir',
+        required=True,
+        help='Path to the output directory'
+    )
+
+    parser.add_argument(
         '--questions',
         required=True,
         help='Number of questions to generate per chunk'
@@ -73,6 +79,7 @@ def main():
     # Generate QA per chunk
     success, failure = _generate_qa_per_chunk(
         input_dir=Path(args.inputdir),
+        output_dir=Path(args.outputdir),
         number_of_questions=int(args.questions),
         cleanup=args.cleanup,
         merge_csv=True,

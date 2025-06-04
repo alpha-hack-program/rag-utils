@@ -549,6 +549,7 @@ def delete_all_csv_files(input_dir: Path) -> None:
 
 def _generate_qa_per_chunk(
     input_dir: Path,
+    output_dir: Path,
     number_of_questions: int,
     cleanup: bool,
     merge_csv: bool = False,
@@ -677,7 +678,9 @@ def _generate_qa_per_chunk(
     if merge_csv:
         timestamp = time.strftime("%Y%m%dT%H%M%S", time.gmtime())
         merged_filestem = generate_safe_filestem(f"{merged_csv_filestem_prefix}_{openai_api_model}_{timestamp}")
-        merged_csv_file = input_dir / f"{merged_filestem}.csv"
+        merged_csv_file = output_dir / f"{merged_filestem}.csv"
+        # Ensure the output directory exists
+        output_dir.mkdir(parents=True, exist_ok=True)
         # Log the merging of CSV files
         _log.info(f"Merging all CSV files in {input_dir} into {merged_csv_file}.")
         merge_all_csv_files_for_model(input_dir=input_dir, output_file=merged_csv_file)
@@ -691,7 +694,6 @@ def _generate_qa_per_chunk(
         failed_chunk_sets,
     )
 
-# Add chunks to Milvus
 @dsl.component(
     base_image=BASE_IMAGE,
     target_image=TARGET_IMAGE,
@@ -703,6 +705,7 @@ def _generate_qa_per_chunk(
 def generate_qa_per_chunk(
     root_mount_path: str,
     input_dir_name: str,
+    output_dir_name: str,
     number_of_questions: int,
     cleanup: bool = False,
     merge_csv: bool = True,
@@ -729,6 +732,9 @@ def generate_qa_per_chunk(
     
     # Construct the input directory path
     input_dir = Path(root_mount_path) / input_dir_name
+
+    # Construct the output directory path
+    output_dir = Path(root_mount_path) / output_dir_name
     
     # Check if the input directory exists
     if not input_dir.exists():
@@ -747,6 +753,7 @@ def generate_qa_per_chunk(
     # Generate questions and answers for each chunk in the input directory
     success, failure = _generate_qa_per_chunk(
         input_dir=input_dir,
+        output_dir=output_dir,
         number_of_questions=number_of_questions,
         cleanup=cleanup,
         merge_csv=merge_csv,
