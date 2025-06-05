@@ -61,7 +61,7 @@ EOF
         --health-start-period=90s \
         --health-timeout=20s \
         --health-retries=3 \
-        milvusdb/milvus:v2.5.11 \
+        docker.io/milvusdb/milvus:v2.5.11 \
         milvus run standalone  1> /dev/null
 }
 
