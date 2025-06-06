@@ -13,17 +13,25 @@ print(f"COMPONENT_NAME: {COMPONENT_NAME}")
 # upload the model to another S3 bucket.
 @dsl.pipeline(name=os.path.basename(__file__).replace('.py', ''))
 def pipeline(
-    input_dir: str = "/tmp/input",
-    output_dir: str = "/tmp/output",
-    force_clean: bool = False):
+    root_mount_path: str,
+    input_dir_name: str,
+    output_dir_name: str,
+    tokenizer_embed_model_id: str  = '',
+    tokenizer_max_tokens: int = 200,
+    merge_peers: bool = True,
+    ):
 
     root_mount_path = "/opt/app/src"
 
     # Train the model
     docling_chunker_task = docling_chunker(
-        input_dir=input_dir,
-        output_dir=output_dir,
-    ).set_caching_options(False)
+        root_mount_path=root_mount_path,
+        input_dir_name=input_dir_name,
+        output_dir_name=output_dir_name,
+        tokenizer_embed_model_id=tokenizer_embed_model_id,
+        tokenizer_max_tokens=tokenizer_max_tokens,
+        merge_peers=merge_peers
+    ).set_caching_options(False) # type: ignore
 
 if __name__ == '__main__':
     from shared.kubeflow import compile_and_upsert_pipeline
@@ -36,7 +44,7 @@ if __name__ == '__main__':
     pipeline_name=f"{COMPONENT_NAME}_pl"
 
     compile_and_upsert_pipeline(
-        pipeline_func=pipeline,
+        pipeline_func=pipeline, # type: ignore
         pipeline_package_path=pipeline_package_path,
         pipeline_name=pipeline_name
     )

@@ -105,7 +105,7 @@ def create_run(client: kfp_cli.Client, pipeline_id: str, experiment_id: str, run
 def compile_and_upsert_pipeline(
         pipeline_func: base_component.BaseComponent,
         pipeline_package_path: str,
-        pipeline_name: str) -> str:
+        pipeline_name: str) -> None:
     
     # Compile the pipeline
     compiler.Compiler().compile(

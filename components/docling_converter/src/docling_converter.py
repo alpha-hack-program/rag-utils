@@ -6,7 +6,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from docling_core.types.doc import ImageRefMode
+from docling_core.types.doc.base import ImageRefMode
 
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import (
@@ -147,47 +147,6 @@ def get_allowed_list_of_input_formats() -> list[InputFormat]:
         list[InputFormat]: List of allowed input formats.
     """
     return list(ALLOWED_INPUT_FORMATS.keys())
-
-def generate_format_options(
-    extensions: set[str],   
-    pipeline_options: PipelineOptions     
-) -> dict[InputFormat, FormatOption]:
-    """
-    Generate format options based on the provided extensions.
-    Args:
-        extensions (set[str]): Set of file extensions.
-    Returns:
-        dict[InputFormat, FormatOption]: Dictionary mapping InputFormat to FormatOption.
-    """
-    
-    format_options = {}
-    for ext in extensions:
-        for fmt, _ext in ALLOWED_INPUT_FORMATS.items():
-            if ext in _ext:
-                if ext in ALLOWED_INPUT_FORMATS[InputFormat.PDF]:
-                    format_options[fmt] = PdfFormatOption(
-                        pipeline_options=pipeline_options
-                    )
-                elif ext in ALLOWED_INPUT_FORMATS[InputFormat.DOCX]:
-                    format_options[fmt] = FormatOption()
-                elif ext in ALLOWED_INPUT_FORMATS[InputFormat.PPTX]:
-                    format_options[fmt] = FormatOption(
-                        pipeline_options=pipeline_options
-                    )
-                elif ext in ALLOWED_INPUT_FORMATS[InputFormat.MD]:
-                    format_options[fmt] = MarkdownFormatOption(
-                        pipeline_options=pipeline_options
-                    )
-                elif ext in ALLOWED_INPUT_FORMATS[InputFormat.HTML]:
-                    format_options[fmt] = HTMLFormatOption(
-                        pipeline_options=pipeline_options
-                    )
-                else:
-                    raise ValueError(
-                        f"Unsupported file extension: {ext}. Supported extensions are: {', '.join(ALLOWED_INPUT_FORMATS[fmt])}"
-                    )
-
-    return format_options
 
 # Function to convert documents using Docling
 # This function takes a list of input document paths and an output directory
@@ -343,7 +302,7 @@ def _docling_convert(
                 )
                 succesfully_converted_documents.append(conv_res.input.file)
                 # Mark the file as processed by creating a file with the same name + "{hash}" in the same directory
-                mark_file_processed(conv_res.input.file)
+                mark_file_processed(Path(conv_res.input.file))
             # Check the conversion status and categorize accordingly
             elif conv_res.status == ConversionStatus.PARTIAL_SUCCESS:
                 partially_converted_documents.append(conv_res.input.file)
@@ -428,4 +387,4 @@ if __name__ == "__main__":
     # Generate and save the component YAML file
     component_package_path = __file__.replace('.py', '.yaml')
 
-    docling_converter.save_component_yaml(component_package_path)
+    docling_converter.save_component_yaml(component_package_path) # type: ignore
