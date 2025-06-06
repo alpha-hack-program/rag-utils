@@ -1,0 +1,6 @@
+{
+  "type": "module",
+  "dependencies": {
+    "promptfoo": "^0.114.5"
+  }
+}

@@ -10,3 +10,4 @@ __pycache__/
 scratch*/
 .vscode/
 .DS_Store
+node_modules/

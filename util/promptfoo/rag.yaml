@@ -1,0 +1,22 @@
+columnMapping:
+  input: question
+  expected: answer
+
+providers:
+  - id: file://./openai-custom-provider.mjs
+    label: "Granite 3.1 8B"
+    config:
+      apiBaseUrl: http://192.168.50.20:7777/v1
+      model: granite-3-1-8b
+
+  - id: file://./openai-custom-provider.mjs
+    label: "Mistral 7B"
+    config:
+      apiBaseUrl: http://192.168.50.20:7777/v1
+      model: mistral-7b-instruct-v0-3
+
+  - id: file://./openai-custom-provider.mjs
+    label: "LLaMA 3 8B"
+    config:
+      apiBaseUrl: http://192.168.50.20:7777/v1
+      model: llama-3-1-8b
