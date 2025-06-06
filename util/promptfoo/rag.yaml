@@ -1,6 +1,14 @@
 columnMapping:
-  input: question
   expected: answer
+  vars:
+    question: question
+
+prompts:
+  - id: document_f
+    label: "No Context QA"
+    raw: |
+      Answer the following question as best as you can:
+      {{question}}
 
 providers:
   - id: file://./openai-custom-provider.mjs
