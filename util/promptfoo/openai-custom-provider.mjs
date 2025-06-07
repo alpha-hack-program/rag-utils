@@ -11,8 +11,8 @@ module.exports = class OpenAIProvider {
   }
 
   async callApi(prompt, context, options) {
-    const apiBaseUrl = this.config.apiBaseUrl || 'https://api.openai.com/v1';
-    const model = this.config.model || 'gpt-4.1-mini';
+    const apiBaseUrl = this.config.apiBaseUrl || process.env.OPENAI_API_BASE_URL;
+    const model = this.config.model || process.env.OPENAI_API_MODEL;
     const apiKey = this.config.apiKey || process.env.OPENAI_API_KEY;
 
     const { data } = await promptfoo.cache.fetchWithCache(
