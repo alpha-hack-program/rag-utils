@@ -126,14 +126,19 @@ def pipeline(
             'MILVUS_USERNAME': 'MILVUS_USERNAME',
             'MILVUS_PASSWORD': 'MILVUS_PASSWORD',
         })
+    kubernetes.use_secret_as_volume(
+        task=add_chunks_to_milvus_task,
+        secret_name='rag-pipelines-files',
+        mount_path="/opt/app-root/src/data/",
+    )
     kubernetes.use_secret_as_env(
         task=add_chunks_to_milvus_task,
-        secret_name='openai-connection-embeddings',
+        secret_name='rag-pipelines-env',
         secret_key_to_env={
-            'OPENAI_API_KEY': 'OPENAI_API_KEY',
-            'OPENAI_API_MODEL': 'OPENAI_API_MODEL',
-            'OPENAI_API_BASE': 'OPENAI_API_BASE',
-        })
+            'EMBEDDING_MAP_PATH': 'EMBEDDING_MAP_PATH',
+            'EMBEDDINGS_DEFAULT_MODEL': 'EMBEDDINGS_DEFAULT_MODEL',
+        }
+    )
     
     # Mount the PVC to task s3_sync_task
     kubernetes.mount_pvc(

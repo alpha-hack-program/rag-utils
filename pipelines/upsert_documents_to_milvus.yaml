@@ -119,7 +119,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/add_chunks_to_milvus:v1.0.17
+        image: quay.io/atarazana/add_chunks_to_milvus:v1.0.18
     exec-docling-chunker:
       container:
         args:
@@ -137,7 +137,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/docling_chunker:v1.0.7
+        image: quay.io/atarazana/docling_chunker:v1.0.8
     exec-docling-converter:
       container:
         args:
@@ -155,7 +155,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/docling_converter:v1.0.8
+        image: quay.io/atarazana/docling_converter:v1.0.9
     exec-s3-sync:
       container:
         args:
@@ -357,13 +357,15 @@ platforms:
               secretKey: MILVUS_PASSWORD
             secretName: milvus-connection-documents
           - keyToEnv:
-            - envVar: OPENAI_API_KEY
-              secretKey: OPENAI_API_KEY
-            - envVar: OPENAI_API_MODEL
-              secretKey: OPENAI_API_MODEL
-            - envVar: OPENAI_API_BASE
-              secretKey: OPENAI_API_BASE
-            secretName: openai-connection-embeddings
+            - envVar: EMBEDDING_MAP_PATH
+              secretKey: EMBEDDING_MAP_PATH
+            - envVar: EMBEDDINGS_DEFAULT_MODEL
+              secretKey: EMBEDDINGS_DEFAULT_MODEL
+            secretName: rag-pipelines-env
+          secretAsVolume:
+          - mountPath: /opt/app-root/src/data/
+            optional: false
+            secretName: rag-pipelines-files
         exec-docling-chunker:
           pvcMount:
           - componentInputParameter: documents_pvc_name

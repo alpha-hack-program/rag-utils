@@ -53,10 +53,39 @@ milvus_port = os.environ.get('MILVUS_PORT')
 milvus_username = os.environ.get('MILVUS_USERNAME')
 milvus_password = os.environ.get('MILVUS_PASSWORD')
 
-# Get the OpenAI connection details
-openai_api_key = os.environ.get('OPENAI_API_KEY', '')
-openai_api_model = os.environ.get('OPENAI_API_MODEL')
-openai_api_embeddings_url = os.environ.get('OPENAI_API_BASE')
+# Load embedding config map from file
+EMBEDDING_MAP_PATH = os.getenv("EMBEDDING_MAP_PATH", "add_chunks_to_milvus/src/scratch/embedding_map.json")
+EMBEDDINGS_DEFAULT_MODEL = os.getenv("EMBEDDINGS_DEFAULT_MODEL", "multilingual-e5-large-gpu")
+
+# Check if EMBEDDING_MAP_PATH is set
+if not EMBEDDING_MAP_PATH:
+    raise RuntimeError("EMBEDDING_MAP_PATH must be set in environment variables.")
+# Check if EMBEDDINGS_DEFAULT_MODEL is set
+if not EMBEDDINGS_DEFAULT_MODEL:
+    raise RuntimeError("EMBEDDINGS_DEFAULT_MODEL must be set in environment variables.")
+
+try:
+    with open(EMBEDDING_MAP_PATH, "r") as f:
+        EMBEDDING_CONFIG_MAP = json.load(f)
+except Exception as e:
+    raise RuntimeError(f"Failed to load embedding configuration from {EMBEDDING_MAP_PATH}: {e}")
+
+if not EMBEDDINGS_DEFAULT_MODEL:
+    raise RuntimeError("EMBEDDINGS_DEFAULT_MODEL must be set in environment variables.")
+
+embedding_config = EMBEDDING_CONFIG_MAP.get(EMBEDDINGS_DEFAULT_MODEL)
+if embedding_config is None:
+    raise RuntimeError(f"Embedding model '{EMBEDDINGS_DEFAULT_MODEL}' not found in embeddings map.")
+
+embedding_url_suffix = embedding_config.get("url_suffix", "v1/embeddings")
+openai_api_key = embedding_config.get("api_key", "")
+openai_api_embeddings_url = embedding_config.get("url", "")
+openai_api_model = embedding_config.get("model", "")
+
+# # Get the OpenAI connection details
+# openai_api_key = os.environ.get('OPENAI_API_KEY', '')
+# openai_api_model = os.environ.get('OPENAI_API_MODEL')
+# openai_api_embeddings_url = os.environ.get('OPENAI_API_BASE')
 
 def query_milvus(
     collection_name: str,

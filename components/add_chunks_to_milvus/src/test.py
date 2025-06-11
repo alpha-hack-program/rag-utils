@@ -57,14 +57,9 @@ def main():
     MILVUS_PORT = os.getenv("MILVUS_PORT")
     MILVUS_USERNAME = os.getenv("MILVUS_USERNAME")
     MILVUS_PASSWORD = os.getenv("MILVUS_PASSWORD")
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    OPENAI_API_MODEL = os.getenv("OPENAI_API_MODEL")
-    OPENAI_API_BASE = os.getenv("OPENAI_API_BASE")
 
     if not all([MILVUS_DATABASE, MILVUS_HOST, MILVUS_PORT, MILVUS_USERNAME, MILVUS_PASSWORD]):
         raise ValueError("Missing required environment variables for Milvus connection.")
-    if not all([OPENAI_API_MODEL, OPENAI_API_BASE]):
-        raise ValueError("Missing required environment variables for OpenAI connection to generate embeddings.")
 
     # Start the timer
     start_time = time.time()

@@ -17,11 +17,11 @@ providers:
       apiBaseUrl: ${API_BASE_URL}
       model: granite-3-1-8b
 
-  - id: file://./openai-custom-provider.mjs
-    label: "Mistral 7B"
-    config:
-      apiBaseUrl: ${API_BASE_URL}
-      model: mistral-7b-instruct-v0-3
+  # - id: file://./openai-custom-provider.mjs
+  #   label: "Mistral 7B"
+  #   config:
+  #     apiBaseUrl: ${API_BASE_URL}
+  #     model: mistral-7b-instruct-v0-3
 
   - id: file://./openai-custom-provider.mjs
     label: "LLaMA 3 8B"
