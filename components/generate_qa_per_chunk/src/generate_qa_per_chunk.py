@@ -49,6 +49,7 @@ openai_api_embeddings_url = os.environ.get('OPENAI_API_BASE')
 # Prompt template for the LLM to generate questions and answers given a context
 SYSTEM_PROMPT = """
 You are a helpful assistant that can generate questions given the context of a document.
+Questions should self-contained and answerable based only the context provided.
 Parse the array "questions" and "answers" and output them as a JSON object. 
 
 EXAMPLE INPUT:
@@ -97,7 +98,7 @@ RESPONSE_FORMAT_SCHEMA = {
   }
 }
 
-MINIMUM_CHUNK_LENGTH_FOR_QA = 512  # Minimum length of chunk text to be considered for QA generation
+MINIMUM_CHUNK_LENGTH_FOR_QA = 768  # Minimum length of chunk text to be considered for QA generation
 MAX_TOKENS = 512  # Maximum number of tokens for the response
 MAX_QUESTIONS = 5  # Maximum number of questions to generate
 TEMPERATURE = 1.0  # Temperature for the model response

@@ -61,7 +61,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/generate_qa_per_chunk:v1.0.1
+        image: quay.io/atarazana/generate_qa_per_chunk:v1.0.2
 pipelineInfo:
   name: generate-qa-per-chunk
 root:
