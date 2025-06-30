@@ -1,7 +1,17 @@
+
 columnMapping:
   expected: answer
   vars:
     question: question
+
+# ▼ NEW: add once, anywhere before prompts/providers/tests ▼
+defaultTest:
+  # applies to every row that comes in from -t merged_qa_tmp.csv
+  assert:
+    - type: similar      # → cosine–similarity check
+      threshold: 0.75    # tweak to your tolerance (0–1). 0.75 is Promptfoo’s default.
+      value: "{{answer}}"    # <- row-specific ground-truth
+      provider: huggingface:sentence-similarity:sentence-transformers/all-MiniLM-L6-v2
 
 prompts:
   - id: document_f
@@ -14,17 +24,24 @@ providers:
   - id: file://./openai-custom-provider.mjs
     label: "Granite 3.1 8B"
     config:
-      apiBaseUrl: ${API_BASE_URL}
-      model: granite-3-1-8b
+      apiBaseUrl: https://router-rag-base.apps.ocp.sandbox425.opentlc.com/v1
+      model: granite-3-3-8b
 
   # - id: file://./openai-custom-provider.mjs
   #   label: "Mistral 7B"
   #   config:
-  #     apiBaseUrl: ${API_BASE_URL}
+  #     apiBaseUrl: https://router-rag-base.apps.ocp.sandbox425.opentlc.com
   #     model: mistral-7b-instruct-v0-3
 
   - id: file://./openai-custom-provider.mjs
     label: "LLaMA 3 8B"
     config:
-      apiBaseUrl: ${API_BASE_URL}
-      model: llama-3-1-8b
+      apiBaseUrl: https://router-rag-base.apps.ocp.sandbox425.opentlc.com/v1
+      model: llama-3-1-8b-w4a16
+
+tests:
+  - description: Evaluate output using LLM
+    assert:
+      - type: llm-rubric
+        value: Is written in a professional tone
+        provider: deepseek:chat

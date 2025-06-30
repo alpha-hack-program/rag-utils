@@ -57,7 +57,10 @@ if [ ! -f "$merged_file" ]; then
   exit 1
 fi
 
+export HF_API_TOKEN
+
 # Run the promptfoo eval command with the merged CSV file
-npx promptfoo eval \
+npx promptfoo@latest eval \
+  --max-concurrency 4 \
   -c ./rag.yaml \
   -t ./scratch/merged_qa_tmp.csv

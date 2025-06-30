@@ -3,16 +3,14 @@
 # Set variables
 WEBUI_IMAGE="ghcr.io/open-webui/open-webui:main"
 CONTAINER_NAME="open-webui"
-HOST_PORT=3000
-# LLM_HOST=$(ipconfig getifaddr en0)
-# LLM_PORT=8888
-# LLM_HOST=192.168.50.20
-LLM_HOST=host.containers.internal
-LLM_PORT=7777
+HOST_PORT=5000
 
+# LLM_PORT=7777
+LLM_PORT=7856
+LLM_HOST=${LLM_HOST:-http://host.containers.internal:${LLM_PORT}}
 
-API_KEY="NA"  # Dummy key for OpenAI-compatible APIs
-API_BASE_URL="http://${LLM_HOST}:${LLM_PORT}/v1"
+API_KEY="1234"  # Dummy key for OpenAI-compatible APIs
+API_BASE_URL="${LLM_HOST}/v1"
 
 echo "➡️ API_BASE_URL=${API_BASE_URL}"
 
