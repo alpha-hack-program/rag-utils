@@ -46,6 +46,14 @@ done
 # Echo the PYTHONPATH
 echo "PYTHONPATH: ${PYTHONPATH}"
 
+# Check if oc command is available
+if ! command -v oc &> /dev/null; then
+  echo "WARNING: oc command not found. Please install OpenShift CLI (oc) and ensure it is in your PATH."
+  echo "Trying to compile and upsert pipeline ${PIPELINE} directly."
+  python ${PIPELINE}
+  exit 1
+fi
+
 TOKEN=$(oc whoami -t)
 
 # If TOKEN is empty print error and exit
