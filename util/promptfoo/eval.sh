@@ -57,7 +57,7 @@ if [ ! -f "$merged_file" ]; then
   exit 1
 fi
 
-export HF_API_TOKEN
+export HF_API_TOKEN API_BASE_URL
 
 # Run the promptfoo eval command with the merged CSV file
 npx promptfoo@latest eval \
