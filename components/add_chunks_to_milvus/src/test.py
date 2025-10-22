@@ -44,11 +44,18 @@ def main():
         required=True,
         help='Milvus Collection Name'
     )
-    
+
+    parser.add_argument(
+        '--model',
+        required=True,
+        help='Name of the embeddings model to use'
+    )
+
     args = parser.parse_args()
 
     print(f"Input directory: {args.inputdir}")
-
+    print(f"Collection name: {args.collection}")
+    print(f"Embeddings model name: {args.model}")
     # Check environment variables for:
     # MILVUS_HOST, MILVUS_PORT, MILVUS_USER, MILVUS_PASSWORD
     # OPENAI_API_KEY, OPENAI_API_BASE, OPENAI_API_VERSION
@@ -68,6 +75,7 @@ def main():
     success, failure = _add_chunks_to_milvus(
         input_dir=Path(args.inputdir),
         milvus_collection_name=args.collection,
+        embeddings_model_name=args.model,
     )
 
     # Log the conversion results

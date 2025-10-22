@@ -7,6 +7,7 @@ import json
 
 from datetime import datetime
 from typing import Optional
+from dataclasses import dataclass
 
 from tqdm import tqdm
 
@@ -55,14 +56,14 @@ milvus_password = os.environ.get('MILVUS_PASSWORD')
 
 # Load embedding config map from file
 EMBEDDING_MAP_PATH = os.getenv("EMBEDDING_MAP_PATH", "add_chunks_to_milvus/src/scratch/embedding_map.json")
-EMBEDDINGS_DEFAULT_MODEL = os.getenv("EMBEDDINGS_DEFAULT_MODEL", "multilingual-e5-large-gpu")
+# EMBEDDINGS_DEFAULT_MODEL = os.getenv("EMBEDDINGS_DEFAULT_MODEL", "multilingual-e5-large-gpu")
 
 # Check if EMBEDDING_MAP_PATH is set
 if not EMBEDDING_MAP_PATH:
     raise RuntimeError("EMBEDDING_MAP_PATH must be set in environment variables.")
 # Check if EMBEDDINGS_DEFAULT_MODEL is set
-if not EMBEDDINGS_DEFAULT_MODEL:
-    raise RuntimeError("EMBEDDINGS_DEFAULT_MODEL must be set in environment variables.")
+# if not EMBEDDINGS_DEFAULT_MODEL:
+#     raise RuntimeError("EMBEDDINGS_DEFAULT_MODEL must be set in environment variables.")
 
 try:
     with open(EMBEDDING_MAP_PATH, "r") as f:
@@ -70,26 +71,19 @@ try:
 except Exception as e:
     raise RuntimeError(f"Failed to load embedding configuration from {EMBEDDING_MAP_PATH}: {e}")
 
-if not EMBEDDINGS_DEFAULT_MODEL:
-    raise RuntimeError("EMBEDDINGS_DEFAULT_MODEL must be set in environment variables.")
-
-embedding_config = EMBEDDING_CONFIG_MAP.get(EMBEDDINGS_DEFAULT_MODEL)
-if embedding_config is None:
-    raise RuntimeError(f"Embedding model '{EMBEDDINGS_DEFAULT_MODEL}' not found in embeddings map.")
-
-embedding_url_suffix = embedding_config.get("url_suffix", "v1/embeddings")
-openai_api_key = embedding_config.get("api_key", "")
-openai_api_embeddings_url = embedding_config.get("url", "")
-openai_api_model = embedding_config.get("model", "")
-
-# # Get the OpenAI connection details
-# openai_api_key = os.environ.get('OPENAI_API_KEY', '')
-# openai_api_model = os.environ.get('OPENAI_API_MODEL')
-# openai_api_embeddings_url = os.environ.get('OPENAI_API_BASE')
+@dataclass
+class EmbeddingConfig:
+    """Configuration for embedding model"""
+    url_suffix: str
+    api_key: str
+    url: str
+    model: str
+    dimension: int
 
 def query_milvus(
     collection_name: str,
     query_text: str,
+    config: EmbeddingConfig,
     params: Optional[dict] = None,
     expr: Optional[str] = None,
     top_k: int = 10,
@@ -123,7 +117,7 @@ def query_milvus(
     collection.load()
 
     # Get query embedding
-    embedding = get_embedding(query_text)
+    embedding = get_embedding(query_text, config)
 
     if params is None:
         params = {
@@ -155,12 +149,11 @@ def query_milvus(
     ]
 
 
-def check_openai_embeddings_connection():
+def check_openai_embeddings_connection(config: EmbeddingConfig):
     """
     Check the connection to OpenAI API using requests.
     Args:
-        openai_api_key (str): OpenAI API key.
-        openai_api_embeddings_url (str): OpenAI API embeddings URL.
+        config (EmbeddingConfig): Embedding configuration.
     Raises:
         requests.exceptions.RequestException: If the connection to OpenAI API fails.
     """
@@ -169,11 +162,11 @@ def check_openai_embeddings_connection():
             "Content-Type": "application/json",
         }
         # Add authorization header if the API key is set
-        if openai_api_key:
-            headers["Authorization"] = f"Bearer {openai_api_key}"
+        if config.api_key:
+            headers["Authorization"] = f"Bearer {config.api_key}"
 
         response = requests.get(
-            f"{openai_api_embeddings_url}/v1/models",
+            f"{config.url}/v1/models",
             headers=headers,
         )
         response.raise_for_status()
@@ -225,23 +218,24 @@ def compute_content_hash(content: str) -> str:
     """
     return hashlib.sha256(content.encode('utf-8')).hexdigest()
 
-def use_preferred_embedding_template(content: str) -> str:
+def use_preferred_embedding_template(content: str, config: EmbeddingConfig) -> str:
     """
     Use the preferred template for the model to generate the embedding.
     
     Args:
         content (str): Content to embed.
+        config (EmbeddingConfig): Embedding configuration.
         
     Returns:
         str: Content with the preferred template applied.
     """
     # If the OpenAI API model is not set, return the content as is
-    if not openai_api_model:
+    if not config.model:
         _log.warning("OpenAI API model is not set. Using content as is.")
         return content
 
     # If model name starts with multilingual-e5-large, use the preferred template
-    if openai_api_model.startswith("multilingual-e5-large"):
+    if config.model.startswith("multilingual-e5-large"):
         # Use the preferred template for multilingual-e5-large
         content = f"passage: {content}"
     
@@ -249,6 +243,7 @@ def use_preferred_embedding_template(content: str) -> str:
 
 def get_embedding(
     content: str,
+    config: EmbeddingConfig,
     use_preferred_template: bool = True,
 ):
     """
@@ -256,6 +251,7 @@ def get_embedding(
     
     Args:
         content (str): Content to embed.
+        config (EmbeddingConfig): Embedding configuration.
         use_preferred_template (bool): Whether to use the preferred template for the model to generate the embedding.
         
     Returns:
@@ -267,29 +263,32 @@ def get_embedding(
 
     # If use_prefered_template is True, use the preferred prefix for the model
     if use_preferred_template:
-        content = use_preferred_embedding_template(content)
+        content = use_preferred_embedding_template(content, config)
 
     headers = {
         "Content-Type": "application/json",
     }
     # Add authorization header if the API key is set
-    if openai_api_key:
-        headers["Authorization"] = f"Bearer {openai_api_key}"
+    if config.api_key:
+        headers["Authorization"] = f"Bearer {config.api_key}"
     data = {
-        "model": openai_api_model,
+        "model": config.model,
         "input": content,
     }
     response = requests.post(
-        f"{openai_api_embeddings_url}/v1/embeddings",
+        f"{config.url}/v1/embeddings",
         headers=headers,
         json=data,
     )
+    _log.debug(f"RESPONSE HEADERS: {response.headers}")
+    _log.debug(f"RESPONSE CONTENT: {response.content}")
     response.raise_for_status()
     return response.json()["data"][0]["embedding"]
 
 def process_document_chunks(
     document_chunks_path: Path,
     milvus_collection: Collection,
+    config: EmbeddingConfig,
 ):
     """
     Process a single document chunk directory.
@@ -357,6 +356,7 @@ def process_document_chunks(
             # Get the embedding
             embedding = get_embedding(
                 contextualized_content,
+                config,
             )
 
             # Page numbers as the min and max of doc_item[i].prov.page_no
@@ -441,6 +441,7 @@ def process_document_chunks(
 def process_batch_of_document_chunks(
     batch: list[Path],
     milvus_collection: Collection,
+    config: EmbeddingConfig,
     raises_on_error: bool = True,
 ) -> tuple[list[Path], list[Path]]:
     """
@@ -462,6 +463,7 @@ def process_batch_of_document_chunks(
             process_document_chunks(
                 document_chunks_path=document_chunks_path,
                 milvus_collection=milvus_collection,
+                config=config,
             )
             # If successful, add to the list of successes
             sucesses.append(document_chunks_path)
@@ -645,15 +647,37 @@ def _create_indexes(collection):
 def _add_chunks_to_milvus(
     input_dir: Path,
     milvus_collection_name: str,
+    embeddings_model_name: str,
 ) -> tuple[list[Path], list[Path]]:
     """
     Convert documents using Docling.
     Args:
         input_dir (Path): Path to the input directory.
         milvus_collection_name (str): Name of the Milvus collection.
+        embeddings_model_name (str): Name of the embedding model to use.
     Returns:
         Tuple[list[Path], list[Path]]: Lists of successfully added, and failed.
     """
+    # Load embedding config for the specified model
+    embedding_config_dict = EMBEDDING_CONFIG_MAP.get(embeddings_model_name)
+    _log.info(f"Embedding config dict: {embedding_config_dict}")
+    if embedding_config_dict is None:
+        raise RuntimeError(f"Embedding model '{embeddings_model_name}' not found in embeddings map.")
+
+    # Convert dimension to int with proper validation
+    dimension_raw = embedding_config_dict.get("dimension", 0)
+    try:
+        dimension = int(dimension_raw) if dimension_raw else 0
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid dimension value '{dimension_raw}' for model '{embeddings_model_name}': {e}")
+    
+    config = EmbeddingConfig(
+        url_suffix=embedding_config_dict.get("url_suffix", "v1/embeddings"),
+        api_key=embedding_config_dict.get("api_key", ""),
+        url=embedding_config_dict.get("url", ""),
+        model=embedding_config_dict.get("model", ""),
+        dimension=dimension
+    )
 
     # Validate input parameters
     if not input_dir:
@@ -665,7 +689,7 @@ def _add_chunks_to_milvus(
         raise ValueError("Missing required environment variables for Milvus connection.")
 
     # Validate OpenAI connection parameters
-    if not openai_api_model or not openai_api_embeddings_url:
+    if not config.model or not config.url:
         raise ValueError("Missing required environment variables for OpenAI connection to generate embeddings.")
 
     # Log input directory
@@ -681,17 +705,15 @@ def _add_chunks_to_milvus(
         raise ValueError("Missing required environment variables for Milvus connection.")
     
     # Log OpenAI connection details
-    _log.info(f"Connecting to OpenAI API with model: {openai_api_model}")
-    _log.info(f"Using OpenAI API key: {openai_api_key}")
-    _log.info(f"Using OpenAI API embeddings URL: {openai_api_embeddings_url}")
+    _log.info(f"Connecting to OpenAI API with model: {config.model}")
+    _log.info(f"Using OpenAI API key: {'*' * len(config.api_key) if config.api_key else 'Not set'}")
+    _log.info(f"Using OpenAI API embeddings URL: {config.url}")
 
-    # Fail if openai_api_model or openai_api_embeddings_url are not set
-    if not all([ openai_api_model, openai_api_embeddings_url]):
+    # Fail if config.model or config.url are not set
+    if not all([config.model, config.url]):
         raise ValueError("Missing required environment variables for OpenAI connection to generate embeddings.")
     
     # Fail if the input directory is not set or does not exist
-    if not input_dir:
-        raise ValueError("Input directory is not set.")
     if not input_dir.exists():
         raise ValueError(f"Input directory {input_dir} does not exist.")
     
@@ -699,15 +721,13 @@ def _add_chunks_to_milvus(
     check_milvus_connection()
 
     # Test the connection to OpenAI using requests
-    check_openai_embeddings_connection()
+    check_openai_embeddings_connection(config)
     
     # Set embedding dimension based on the model
-    if openai_api_model.startswith("multilingual-e5-large"):
-        embedding_dim = 1024
-    else:
-        raise ValueError(f"Unsupported OpenAI model: {openai_api_model}")
-    # Log the embedding dimension
+    embedding_dim = config.dimension
     _log.info(f"Embedding dimension: {embedding_dim}")
+    if not embedding_dim:
+        raise ValueError("Embedding dimension is not set.")
 
     # Initialize
     milvus_collection = init(
@@ -750,6 +770,7 @@ def _add_chunks_to_milvus(
         sucesses, failures = process_batch_of_document_chunks(
             batch=batch,
             milvus_collection=milvus_collection,
+            config=config,
             raises_on_error=False,
         )
         # Add the successfully processed chunk directories to the list
@@ -794,6 +815,7 @@ def add_chunks_to_milvus(
     root_mount_path: str,
     input_dir_name: str,
     milvus_collection_name: str,
+    embeddings_model_name: str,
 ) -> str:
     """
     Add chunks to Milvus collection.
@@ -801,6 +823,7 @@ def add_chunks_to_milvus(
         root_mount_path (str): Root mount path where the input directory is located.
         input_dir_name (str): Name of the input directory containing chunk directories.
         milvus_collection_name (str): Name of the Milvus collection to add chunks to.
+        embeddings_default_model (str): Name of the default embedding model to use.
     Returns:
         str: JSON string containing lists of successfully added and failed chunk directories.
     """
@@ -833,6 +856,7 @@ def add_chunks_to_milvus(
     success, failure = _add_chunks_to_milvus(
         input_dir=input_dir,
         milvus_collection_name=milvus_collection_name,
+        embeddings_model_name=embeddings_model_name,
     )
 
     # Log the number of successfully added and failed chunk directories

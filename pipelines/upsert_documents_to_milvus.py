@@ -55,6 +55,7 @@ def pipeline(
     documents_dir_name: str = "documents",
     converted_dir_name: str = "converted",
     chunks_dir_name: str = "chunks",
+    embeddings_model_name: str = "multilingual-e5-large-gpu",
     tokenizer_embed_model_id: str = "intfloat/multilingual-e5-large",
     tokenizer_max_tokens: int = 476, # 464 = 512 - 48 (for the prompt)
     merge_peers: bool = True,
@@ -101,6 +102,7 @@ def pipeline(
         root_mount_path=root_mount_path,
         input_dir_name=chunks_dir_name, # chunks_dir_name
         milvus_collection_name=milvus_collection_name,
+        embeddings_model_name=embeddings_model_name,
     ).after(docling_chunker_task).set_display_name("insert_chunks").set_caching_options(False)
         
     # Set the kubernetes secret to be used in the get_chunks_from_documents task

@@ -1,6 +1,7 @@
 # PIPELINE DEFINITION
 # Name: add-chunks-to-milvus
 # Inputs:
+#    embeddings_model_name: str
 #    input_dir_name: str
 #    milvus_collection_name: str
 #    root_mount_path: str
@@ -11,6 +12,8 @@ components:
     executorLabel: exec-add-chunks-to-milvus
     inputDefinitions:
       parameters:
+        embeddings_model_name:
+          parameterType: STRING
         input_dir_name:
           description: Name of the input directory containing chunk directories.
           parameterType: STRING
@@ -43,7 +46,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/add_chunks_to_milvus:v1.0.18
+        image: quay.io/atarazana/add_chunks_to_milvus:v1.1.2
 pipelineInfo:
   name: add-chunks-to-milvus
 root:
@@ -62,6 +65,8 @@ root:
           name: comp-add-chunks-to-milvus
         inputs:
           parameters:
+            embeddings_model_name:
+              componentInputParameter: embeddings_model_name
             input_dir_name:
               componentInputParameter: input_dir_name
             milvus_collection_name:
@@ -72,6 +77,8 @@ root:
           name: add-chunks-to-milvus
   inputDefinitions:
     parameters:
+      embeddings_model_name:
+        parameterType: STRING
       input_dir_name:
         description: Name of the input directory containing chunk directories.
         parameterType: STRING
