@@ -5,42 +5,131 @@ columnMapping:
     question: question
 
 # ▼ NEW: add once, anywhere before prompts/providers/tests ▼
+# defaultTest:
+#   # applies to every row that comes in from -t merged_qa_tmp.csv
+#   assert:
+#     - type: similar      # → cosine–similarity check
+#       threshold: 0.70    # tweak to your tolerance (0–1). 0.70 is Promptfoo’s default.
+#       value: "{{answer}}"    # <- row-specific ground-truth
+#       provider: huggingface:sentence-similarity:sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+
+
+# FINAL CORRECTED Configuration
+# Proper Promptfoo variable access: context.vars.{varname}
+# Your CSV has: question, answer, context
+
 defaultTest:
-  # applies to every row that comes in from -t merged_qa_tmp.csv
   assert:
-    - type: similar      # → cosine–similarity check
-      threshold: 0.75    # tweak to your tolerance (0–1). 0.75 is Promptfoo’s default.
-      value: "{{answer}}"    # <- row-specific ground-truth
-      provider: huggingface:sentence-similarity:sentence-transformers/all-MiniLM-L6-v2
+    # Primary: Better similarity model with lower threshold
+    - type: similar
+      threshold: 0.68
+      value: "{{answer}}"
+      provider: huggingface:sentence-similarity:sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+      weight: 0.5
+    
+    # Secondary: Verify correct legal act is cited
+    - type: javascript
+      value: |
+        // Access the 'context' variable from your CSV
+        const contextStr = context.vars.context || '';
+        const outputStr = output || '';
+        
+        // Extract act number from context (e.g., "2025/102-SD")
+        const actMatch = contextStr.match(/Act No\. ([\d\/\-A-Z]+)/);
+        
+        if (!actMatch) {
+          return { 
+            pass: true, 
+            score: 1, 
+            reason: "No specific act to verify" 
+          };
+        }
+        
+        const expectedAct = actMatch[1];
+        const hasCitation = outputStr.includes(expectedAct);
+        
+        return {
+          pass: hasCitation,
+          score: hasCitation ? 1 : 0.3,
+          reason: hasCitation 
+            ? `✓ Correctly cites ${expectedAct}` 
+            : `✗ Missing reference to ${expectedAct}`
+        };
+      weight: 0.3
+
+    # Tertiary: Penalize "I don't know" responses
+    - type: javascript
+      value: |
+        const outputStr = String(output || '').toLowerCase();
+        const dontKnowPhrases = [
+          "i don't know",
+          "i do not know",
+          "cannot find",
+          "cannot determine",
+          "no information",
+          "not specified",
+          "not available"
+        ];
+        
+        const isVague = dontKnowPhrases.some(phrase => outputStr.includes(phrase));
+        
+        return {
+          pass: !isVague,
+          score: isVague ? 0 : 1,
+          reason: isVague 
+            ? "❌ Answer is too vague/non-committal" 
+            : "✓ Answer is substantive"
+        };
+      weight: 0.2
+
+# Model list:
+# granite-3-3-8b__multilingual-e5-large-gpu
+# granite-3-3-8b__jina-embeddings-v3-gpu
+# granite-3-3-8b__bge-m3-gpu
+# llama-3-1-8b-w4a16__multilingual-e5-large-gpu
+# llama-3-1-8b-w4a16__jina-embeddings-v3-gpu
+# llama-3-1-8b-w4a16__bge-m3-gpu
 
 prompts:
   - id: document_f
     label: "No Context QA"
     raw: |
-      {{question}}
+      Be concise and to the point. Answer the question.
+      Question: {{question}}
 
 providers:
   - id: file://./openai-custom-provider.mjs
-    label: "Granite 3.1 8B"
+    label: "granite-3-3-8b__multilingual-e5-large-gpu"
     config:
-      apiBaseUrl: https://router-rag-base.apps.ocp.sandbox425.opentlc.com/v1
-      model: granite-3-3-8b
-
-  # - id: file://./openai-custom-provider.mjs
-  #   label: "Mistral 7B"
-  #   config:
-  #     apiBaseUrl: https://router-rag-base.apps.ocp.sandbox425.opentlc.com
-  #     model: mistral-7b-instruct-v0-3
+      apiBaseUrl: https://router-rag-base.apps.ocp.sandbox2385.opentlc.com/v1
+      model: granite-3-3-8b__multilingual-e5-large-gpu
 
   - id: file://./openai-custom-provider.mjs
-    label: "LLaMA 3 8B"
+    label: "llama-3-1-8b-w4a16__multilingual-e5-large-gpu"
     config:
-      apiBaseUrl: https://router-rag-base.apps.ocp.sandbox425.opentlc.com/v1
-      model: llama-3-1-8b-w4a16
+      apiBaseUrl: https://router-rag-base.apps.ocp.sandbox2385.opentlc.com/v1
+      model: llama-3-1-8b-w4a16__multilingual-e5-large-gpu
 
-tests:
-  - description: Evaluate output using LLM
-    assert:
-      - type: llm-rubric
-        value: Is written in a professional tone
-        provider: deepseek:chat
+  - id: file://./openai-custom-provider.mjs
+    label: "granite-3-3-8b__jina-embeddings-v3-gpu"
+    config:
+      apiBaseUrl: https://router-rag-base.apps.ocp.sandbox2385.opentlc.com/v1
+      model: granite-3-3-8b__jina-embeddings-v3-gpu
+
+  - id: file://./openai-custom-provider.mjs
+    label: "llama-3-1-8b-w4a16__jina-embeddings-v3-gpu"
+    config:
+      apiBaseUrl: https://router-rag-base.apps.ocp.sandbox2385.opentlc.com/v1
+      model: llama-3-1-8b-w4a16__jina-embeddings-v3-gpu
+
+  - id: file://./openai-custom-provider.mjs
+    label: "granite-3-3-8b__bge-m3-gpu"
+    config:
+      apiBaseUrl: https://router-rag-base.apps.ocp.sandbox2385.opentlc.com/v1
+      model: granite-3-3-8b__bge-m3-gpu
+
+  - id: file://./openai-custom-provider.mjs
+    label: "llama-3-1-8b-w4a16__bge-m3-gpu"
+    config:
+      apiBaseUrl: https://router-rag-base.apps.ocp.sandbox2385.opentlc.com/v1
+      model: llama-3-1-8b-w4a16__bge-m3-gpu

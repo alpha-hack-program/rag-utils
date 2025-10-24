@@ -63,4 +63,5 @@ export HF_API_TOKEN API_BASE_URL
 npx promptfoo@latest eval \
   --max-concurrency 4 \
   -c ./rag.yaml \
-  -t ./scratch/merged_qa_tmp.csv
+  -t ./scratch/merged_qa_tmp.csv \
+  -o results.json
