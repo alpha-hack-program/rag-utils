@@ -45,7 +45,7 @@ add_chunks_to_milvus_component = load_component_from_file(ADD_CHUNKS_TO_MILVUS_C
 
 # This pipeline will download evaluation data, download the model, test the model and if it performs well, 
 # upload the model to the runtime S3 bucket and refresh the runtime deployment.
-@dsl.pipeline(name=os.path.basename(__file__).replace('.py', ''))
+@dsl.pipeline(name=os.path.basename(__file__).replace('.py', '').replace('_', '-'))
 def pipeline(
     root_mount_path: str = "/opt/app-root/src",
     documents_bucket_folder: str = "documents",
@@ -175,8 +175,8 @@ if __name__ == '__main__':
 
     pipeline_package_path = __file__.replace('.py', '.yaml')
 
-    # Pipeline name
-    pipeline_name=os.path.basename(__file__).replace('.py', '')
+    # Pipeline name (DSPA allows only lowercase alphanumeric, '-' or '.')
+    pipeline_name=os.path.basename(__file__).replace('.py', '').replace('_', '-')
 
     compile_and_upsert_pipeline(
         pipeline_func=pipeline, # type: ignore

@@ -622,7 +622,7 @@ wheels = [
 
 [[package]]
 name = "kfp"
-version = "2.10.1"
+version = "2.13.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -639,7 +639,7 @@ dependencies = [
     { name = "tabulate" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e6/9d/7301b61e5b6ce5e083fcfbdcfd57535f5b9968f7c488a0a744404b324393/kfp-2.10.1.tar.gz", hash = "sha256:e230d292ff71f5d7314cf9d29f368c556ce4d5079a4a806172e7af20bdd216a3", size = 343595 }
+sdist = { url = "https://files.pythonhosted.org/packages/0a/8e/cc5418e615c6923914911b43971c04509bf06153b6113e9e64ecdcc9e8c3/kfp-2.13.0.tar.gz", hash = "sha256:bd3e820452157472614217849f7a1cfd9c5d0d3cc7473ace80b6494ca06e8886", size = 269066 }
 
 [package.optional-dependencies]
 kubernetes = [
@@ -658,13 +658,13 @@ sdist = { url = "https://files.pythonhosted.org/packages/78/92/5df7b43e06329132d
 
 [[package]]
 name = "kfp-pipeline-spec"
-version = "0.5.0"
+version = "0.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "protobuf" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d9/1d/753449b7be76b11e32a9f1ad8f38e0f5d914f95aa2a8c454d75819e3a44d/kfp_pipeline_spec-0.5.0-py3-none-any.whl", hash = "sha256:d21581cfc1f943ef874b771923a7e11f5b49f1bcc221ebf9acf7bcf22a2d145f", size = 9074 },
+    { url = "https://files.pythonhosted.org/packages/21/c4/5a42b32bddae9884b0ab23135f39e49ddb510b56ba9990757c6f873b87ae/kfp_pipeline_spec-0.6.0-py3-none-any.whl", hash = "sha256:9e319b62eaa54c6790a96f796d34f071458c9cae9585c662629eb090688555a7", size = 9081 },
 ]
 
 [[package]]
@@ -1222,8 +1222,8 @@ dependencies = [
 requires-dist = [
     { name = "boto3", specifier = "==1.35.54" },
     { name = "docling", extras = ["vlm"], specifier = "==2.31.0" },
-    { name = "kfp", specifier = "==2.10.1" },
-    { name = "kfp", extras = ["kubernetes"], specifier = "==2.10.1" },
+    { name = "kfp", specifier = "==2.13.0" },
+    { name = "kfp", extras = ["kubernetes"], specifier = "==2.13.0" },
     { name = "pymilvus", specifier = "==2.5.8" },
     { name = "torch", specifier = "==2.2.2" },
     { name = "tqdm", specifier = "==4.66.1" },
